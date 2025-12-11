@@ -329,8 +329,8 @@ static int run_spec_tests(const char *spec_path, bool verbose) {
         return 1;
     }
 
-    fread(json_str, 1, fsize, f);
-    json_str[fsize] = '\0';
+    size_t bytes_read = fread(json_str, 1, fsize, f);
+    json_str[bytes_read] = '\0';
     fclose(f);
 
     cJSON *json = cJSON_Parse(json_str);

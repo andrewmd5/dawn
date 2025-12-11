@@ -75,7 +75,7 @@ static const char *token_names[] = {
 };
 
 const char *hl_token_name(hl_token_t token) {
-    if (token >= 0 && token < HL_TOKEN_COUNT) {
+    if (token < HL_TOKEN_COUNT) {
         return token_names[token];
     }
     return "none";
