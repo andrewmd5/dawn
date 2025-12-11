@@ -24,13 +24,13 @@ static inline bool char_eq(char a, char b, bool case_sensitive) {
 
 //! Find needle in gap buffer starting at pos
 //! @return position of match or SIZE_MAX if not found
-static size_t find_match(const GapBuffer *gb, size_t start, const char *needle, int needle_len, bool case_sensitive) {
+static size_t find_match(const GapBuffer *gb, size_t start, const char *needle, int32_t needle_len, bool case_sensitive) {
     size_t len = gap_len(gb);
     if (needle_len == 0 || start + (size_t)needle_len > len) return SIZE_MAX;
 
     for (size_t pos = start; pos + (size_t)needle_len <= len; pos++) {
         bool found = true;
-        for (int i = 0; i < needle_len; i++) {
+        for (int32_t i = 0; i < needle_len; i++) {
             if (!char_eq(gap_at(gb, pos + i), needle[i], case_sensitive)) {
                 found = false;
                 break;
@@ -51,7 +51,7 @@ static void build_context(const GapBuffer *gb, SearchResult *r) {
     size_t ctx_start = r->pos;
     size_t ctx_end = r->pos + r->len;
 
-    int chars_before = 0;
+    int32_t chars_before = 0;
     while (ctx_start > 0 && chars_before < SEARCH_CONTEXT_CHARS) {
         ctx_start--;
         char c = gap_at(gb, ctx_start);
@@ -62,7 +62,7 @@ static void build_context(const GapBuffer *gb, SearchResult *r) {
         chars_before++;
     }
 
-    int chars_after = 0;
+    int32_t chars_after = 0;
     while (ctx_end < len && chars_after < SEARCH_CONTEXT_CHARS) {
         char c = gap_at(gb, ctx_end);
         if (c == '\n') break;
@@ -70,7 +70,7 @@ static void build_context(const GapBuffer *gb, SearchResult *r) {
         chars_after++;
     }
 
-    int ci = 0;
+    int32_t ci = 0;
 
     if (ctx_start > 0 && gap_at(gb, ctx_start - 1) != '\n') {
         r->context[ci++] = '.';
@@ -78,14 +78,14 @@ static void build_context(const GapBuffer *gb, SearchResult *r) {
         r->context[ci++] = '.';
     }
 
-    r->match_start = ci + (int)(r->pos - ctx_start);
+    r->match_start = ci + (int32_t)(r->pos - ctx_start);
 
-    for (size_t p = ctx_start; p < ctx_end && ci < (int)sizeof(r->context) - 4; p++) {
+    for (size_t p = ctx_start; p < ctx_end && ci < (int32_t)sizeof(r->context) - 4; p++) {
         char c = gap_at(gb, p);
         r->context[ci++] = (c == '\t') ? ' ' : c;
     }
 
-    r->match_len = (int)r->len;
+    r->match_len = (int32_t)r->len;
 
     if (ctx_end < len && gap_at(gb, ctx_end) != '\n') {
         r->context[ci++] = '.';
@@ -98,8 +98,8 @@ static void build_context(const GapBuffer *gb, SearchResult *r) {
 }
 
 //! Count line number at position
-static int count_line_at(const GapBuffer *gb, size_t pos) {
-    int line = 1;
+static int32_t count_line_at(const GapBuffer *gb, size_t pos) {
+    int32_t line = 1;
     for (size_t p = 0; p < pos; p++) {
         if (gap_at(gb, p) == '\n') line++;
     }

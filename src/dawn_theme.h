@@ -9,16 +9,16 @@
 
 //! Set foreground (text) color
 //! @param c RGB color to set
-void set_fg(Color c);
+void set_fg(DawnColor c);
 
 //! Set background color
 //! @param c RGB color to set
-void set_bg(Color c);
+void set_bg(DawnColor c);
 
 //! Move cursor to row and column (1-indexed)
 //! @param r row number (1 = top)
 //! @param c column number (1 = left)
-void move_to(int r, int c);
+void move_to(int32_t r, int32_t c);
 
 //! Write a string to output
 void out_str(const char *str);
@@ -30,10 +30,10 @@ void out_str_n(const char *str, size_t len);
 void out_char(char c);
 
 //! Write N spaces
-void out_spaces(int n);
+void out_spaces(int32_t n);
 
 //! Write an integer
-void out_int(int value);
+void out_int(int32_t value);
 
 //! Flush output buffer
 void out_flush(void);
@@ -43,6 +43,10 @@ void clear_screen(void);
 
 //! Clear current line
 void clear_line(void);
+
+//! Erase N characters at cursor using current background color
+//! @param n number of characters to erase
+void clear_range(int32_t n);
 
 //! Show or hide the cursor
 void cursor_visible(bool visible);
@@ -56,47 +60,52 @@ void sync_begin(void);
 //! End synchronized output
 void sync_end(void);
 
+//! Fill from current column to end of line with background color
+//! Only has effect in print mode
+//! @param bg background color to fill with
+void fill_line_end(DawnColor bg);
+
 // #endregion
 
 // #region Theme Colors
 
 //! Get current theme's background color
-Color get_bg(void);
+DawnColor get_bg(void);
 
 //! Get current theme's foreground (text) color
-Color get_fg(void);
+DawnColor get_fg(void);
 
 //! Get current theme's dimmed/muted text color
-Color get_dim(void);
+DawnColor get_dim(void);
 
 //! Get current theme's accent color (highlights, links)
-Color get_accent(void);
+DawnColor get_accent(void);
 
 //! Get current theme's selection highlight color
-Color get_select(void);
+DawnColor get_select(void);
 
 //! Get current theme's AI panel background color
-Color get_ai_bg(void);
+DawnColor get_ai_bg(void);
 
 //! Get current theme's border/separator color
-Color get_border(void);
+DawnColor get_border(void);
 
 //! Get current theme's code block background color
-Color get_code_bg(void);
+DawnColor get_code_bg(void);
 
 //! Get current theme's modal popup background color
-Color get_modal_bg(void);
+DawnColor get_modal_bg(void);
 
 // #endregion
 
-// #region Color Utilities
+// #region DawnColor Utilities
 
 //! Linear interpolation between two colors
 //! @param a start color
 //! @param b end color
 //! @param t interpolation factor (0.0 = a, 1.0 = b)
 //! @return interpolated color
-Color color_lerp(Color a, Color b, float t);
+DawnColor color_lerp(DawnColor a, DawnColor b, float t);
 
 // #endregion
 
@@ -122,11 +131,11 @@ void reset_attrs(void);
 // #region Styled Text
 
 //! Underline style types (for compatibility)
-typedef PlatformUnderlineStyle UnderlineStyle;
-#define UNDERLINE_STYLE_SINGLE PLATFORM_UNDERLINE_SINGLE
-#define UNDERLINE_STYLE_CURLY  PLATFORM_UNDERLINE_CURLY
-#define UNDERLINE_STYLE_DOTTED PLATFORM_UNDERLINE_DOTTED
-#define UNDERLINE_STYLE_DASHED PLATFORM_UNDERLINE_DASHED
+typedef DawnUnderline UnderlineStyle;
+#define UNDERLINE_STYLE_SINGLE DAWN_UNDERLINE_SINGLE
+#define UNDERLINE_STYLE_CURLY  DAWN_UNDERLINE_CURLY
+#define UNDERLINE_STYLE_DOTTED DAWN_UNDERLINE_DOTTED
+#define UNDERLINE_STYLE_DASHED DAWN_UNDERLINE_DASHED
 
 //! Set underline with style (uses styled underlines if supported)
 //! @param style desired underline style
@@ -134,7 +143,7 @@ void set_underline(UnderlineStyle style);
 
 //! Set underline color
 //! @param c RGB color for underline
-void set_underline_color(Color c);
+void set_underline_color(DawnColor c);
 
 //! Clear underline styling
 void clear_underline(void);
@@ -147,14 +156,14 @@ void clear_underline(void);
 //! @param c the character to print
 //! @param scale integer scale 1-7 (1 = normal, 2 = double, etc.)
 //! Falls back to normal print if platform doesn't support text sizing
-void print_scaled_char(char c, int scale);
+void print_scaled_char(char c, int32_t scale);
 
 //! Print a string at scaled size
 //! @param str the string to print
 //! @param len length of string
 //! @param scale integer scale 1-7 (1 = normal, 2 = double, etc.)
 //! Falls back to normal print if platform doesn't support text sizing
-void print_scaled_str(const char *str, size_t len, int scale);
+void print_scaled_str(const char *str, size_t len, int32_t scale);
 
 //! Print a single character at fractionally scaled size
 //! Uses Kitty text sizing protocol: effective size = scale * (num/denom)
@@ -163,7 +172,7 @@ void print_scaled_str(const char *str, size_t len, int scale);
 //! @param num fractional numerator (0-15, 0 = no fraction)
 //! @param denom fractional denominator (0-15, must be > num when non-zero)
 //! Falls back to integer scaling or normal print if not supported
-void print_scaled_frac_char(char c, int scale, int num, int denom);
+void print_scaled_frac_char(char c, int32_t scale, int32_t num, int32_t denom);
 
 //! Print a string at fractionally scaled size
 //! Uses Kitty text sizing protocol: effective size = scale * (num/denom)
@@ -173,7 +182,7 @@ void print_scaled_frac_char(char c, int scale, int num, int denom);
 //! @param num fractional numerator (0-15, 0 = no fraction)
 //! @param denom fractional denominator (0-15, must be > num when non-zero)
 //! Falls back to integer scaling or normal print if not supported
-void print_scaled_frac_str(const char *str, size_t len, int scale, int num, int denom);
+void print_scaled_frac_str(const char *str, size_t len, int32_t scale, int32_t num, int32_t denom);
 
 // #endregion
 

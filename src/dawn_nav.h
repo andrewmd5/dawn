@@ -21,14 +21,14 @@ size_t nav_line_end(size_t pos);
 //! @param pos current byte position
 //! @param delta lines to move (negative = up, positive = down)
 //! @return new cursor position, preserving column offset
-size_t nav_move_line(size_t pos, int delta);
+size_t nav_move_line(size_t pos, int32_t delta);
 
 //! Move cursor up or down by visual (wrapped) lines
 //! @param pos current byte position
 //! @param delta lines to move (negative = up, positive = down)
 //! @param text_width width for word wrapping
 //! @return new cursor position
-size_t nav_move_visual_line(size_t pos, int delta, int text_width);
+size_t nav_move_visual_line(size_t pos, int32_t delta, int32_t text_width);
 
 //! Move cursor up or down, skipping over block elements (tables, code blocks, images)
 //! @param pos current byte position
@@ -36,7 +36,7 @@ size_t nav_move_visual_line(size_t pos, int delta, int text_width);
 //! @param text_width width for word wrapping
 //! @param skip_blocks if true, skip over block elements; if false, behave like nav_move_visual_line
 //! @return new cursor position
-size_t nav_move_visual_line_block_aware(size_t pos, int delta, int text_width, bool skip_blocks);
+size_t nav_move_visual_line_block_aware(size_t pos, int32_t delta, int32_t text_width, bool skip_blocks);
 
 //! Skip forward out of current block element
 //! @param pos current byte position

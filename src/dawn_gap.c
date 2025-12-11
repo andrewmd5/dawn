@@ -159,7 +159,7 @@ size_t gap_utf8_next(const GapBuffer *gb, size_t pos) {
     if (pos >= len) return len;
 
     uint8_t c = (uint8_t)gap_at(gb, pos);
-    int char_len = utf8proc_utf8class[c];
+    int32_t char_len = utf8proc_utf8class[c];
     if (char_len < 1) char_len = 1;
 
     size_t new_pos = pos + (size_t)char_len;

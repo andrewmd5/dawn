@@ -5,14 +5,13 @@
 
 // #region Timer Operations
 
-int timer_remaining(void) {
+int32_t timer_remaining(void) {
     if (!app.timer_on || app.timer_mins == 0) return app.timer_mins * 60;
-    if (app.timer_paused) return (int)app.timer_paused_at;
+    if (app.timer_paused) return (int32_t)app.timer_paused_at;
 
-    const PlatformBackend *p = platform_get();
-    int64_t now = p && p->time_now ? p->time_now() : 0;
+    int64_t now = DAWN_BACKEND(app)->now();
     int64_t elapsed = now - app.timer_start;
-    int left = app.timer_mins * 60 - (int)elapsed;
+    int32_t left = app.timer_mins * 60 - (int32_t)elapsed;
     return left > 0 ? left : 0;
 }
 
@@ -28,8 +27,7 @@ void timer_check(void) {
 void timer_toggle_pause(void) {
     if (!app.timer_on || app.timer_mins == 0) return;
 
-    const PlatformBackend *p = platform_get();
-    int64_t now = p && p->time_now ? p->time_now() : 0;
+    int64_t now = DAWN_BACKEND(app)->now();
 
     if (app.timer_paused) {
         // Resume: adjust start time to account for pause duration
@@ -42,9 +40,8 @@ void timer_toggle_pause(void) {
     }
 }
 
-void timer_add_minutes(int mins) {
-    const PlatformBackend *p = platform_get();
-    int64_t now = p && p->time_now ? p->time_now() : 0;
+void timer_add_minutes(int32_t mins) {
+    int64_t now = DAWN_BACKEND(app)->now();
 
     if (!app.timer_on) {
         // Start new timer

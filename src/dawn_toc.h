@@ -20,23 +20,23 @@
 //! A single TOC entry
 typedef struct {
     size_t pos;                     //!< Byte position in document
-    int level;                      //!< Header level (1-6)
-    int depth;                      //!< Visual nesting depth (0-based, computed from hierarchy)
+    int32_t level;                      //!< Header level (1-6)
+    int32_t depth;                      //!< Visual nesting depth (0-based, computed from hierarchy)
     char text[TOC_MAX_HEADER_LEN];  //!< Header text (without # prefix)
-    int text_len;                   //!< Length of header text
+    int32_t text_len;                   //!< Length of header text
 } TocEntry;
 
 //! TOC state
 typedef struct {
     TocEntry entries[TOC_MAX_ENTRIES];  //!< All headers
-    int count;                          //!< Number of headers
-    int *filtered;                      //!< Indices of filtered entries
-    int filtered_count;                 //!< Number of filtered entries
-    int selected;                       //!< Selected index in filtered list
+    int32_t count;                          //!< Number of headers
+    int32_t *filtered;                      //!< Indices of filtered entries
+    int32_t filtered_count;                 //!< Number of filtered entries
+    int32_t selected;                       //!< Selected index in filtered list
     char filter[64];                    //!< Filter input
-    int filter_len;                     //!< Filter length
-    int filter_cursor;                  //!< Filter cursor position
-    int scroll;                         //!< Scroll offset
+    int32_t filter_len;                     //!< Filter length
+    int32_t filter_cursor;                  //!< Filter cursor position
+    int32_t scroll;                         //!< Scroll offset
 } TocState;
 
 // #endregion

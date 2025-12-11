@@ -5,13 +5,13 @@
 #include "dawn_theme.h"
 #include "dawn_utils.h"
 #include "dawn_wrap.h"
-#include "platform.h"
+#include "dawn_backend.h"
+#include <limits.h>
 
 // #region Style Application
 
 void md_apply(MdStyle s) {
-    const PlatformBackend *p = platform_get();
-    if (p && p->reset_attrs) p->reset_attrs();
+    DAWN_BACKEND(app)->reset_attrs();
     set_bg(get_bg());
     set_fg(get_fg());
 
@@ -19,87 +19,76 @@ void md_apply(MdStyle s) {
     current_text_scale = 1;
     current_frac_num = 0;
     current_frac_denom = 0;
-
-    // Headers override other styles - each with different size
-    // Refined H1-H6 scale progression (more subtle, closer to traditional typography):
-    // H1: 2.0x (s=2) - Main title
-    // H2: 1.5x (s=2, n=3/d=4) - Section header
-    // H3: 1.25x (s=2, n=5/d=8) - Subsection
-    // H4: 1.0x (s=1) - Minor heading (bold only)
-    // H5: 1.0x (s=1) - Small heading (bold only)
-    // H6: 1.0x (s=1) - Smallest heading (bold only)
-    // When text scaling is available, use a single color (foreground) since
-    // the size difference already distinguishes headers. Different colors are
-    // only needed on platforms without scaled text.
-    bool has_scaling = platform_has(PLATFORM_CAP_TEXT_SIZING);
+    
+    bool has_scaling = dawn_ctx_has(&app.ctx, DAWN_CAP_TEXT_SIZING);
 
     if (s & MD_H1) {
         current_text_scale = 2;
         // No fractional part for H1 - clean 2x
-        if (p && p->set_bold) p->set_bold(true);
-        if (!has_scaling) set_fg((Color){0xFF, 0x66, 0x66});  // Bright red (fallback)
+        DAWN_BACKEND(app)->set_bold(true);
+        if (!has_scaling) set_fg((DawnColor){0xFF, 0x66, 0x66});  // Bright red (fallback)
         return;
     }
     if (s & MD_H2) {
         current_text_scale = 2;
         current_frac_num = 3;
         current_frac_denom = 4;  // 2 * 3/4 = 1.5x
-        if (p && p->set_bold) p->set_bold(true);
-        if (!has_scaling) set_fg((Color){0xFF, 0x99, 0x33});  // Orange (fallback)
+        DAWN_BACKEND(app)->set_bold(true);
+        if (!has_scaling) set_fg((DawnColor){0xFF, 0x99, 0x33});  // Orange (fallback)
         return;
     }
     if (s & MD_H3) {
         current_text_scale = 2;
         current_frac_num = 5;
         current_frac_denom = 8;  // 2 * 5/8 = 1.25x
-        if (p && p->set_bold) p->set_bold(true);
-        if (!has_scaling) set_fg((Color){0xFF, 0xCC, 0x00});  // Yellow (fallback)
+        DAWN_BACKEND(app)->set_bold(true);
+        if (!has_scaling) set_fg((DawnColor){0xFF, 0xCC, 0x00});  // Yellow (fallback)
         return;
     }
     if (s & MD_H4) {
         current_text_scale = 1;
         // No fractional part, normal size
-        if (p && p->set_bold) p->set_bold(true);
-        if (!has_scaling) set_fg((Color){0xA0, 0xE0, 0x40});  // Lime green (fallback)
+        DAWN_BACKEND(app)->set_bold(true);
+        if (!has_scaling) set_fg((DawnColor){0xA0, 0xE0, 0x40});  // Lime green (fallback)
         return;
     }
     if (s & MD_H5) {
         current_text_scale = 1;
         // No fractional part, normal size
-        if (p && p->set_bold) p->set_bold(true);
-        if (!has_scaling) set_fg((Color){0x40, 0xD0, 0xD0});  // Cyan (fallback)
+        DAWN_BACKEND(app)->set_bold(true);
+        if (!has_scaling) set_fg((DawnColor){0x40, 0xD0, 0xD0});  // Cyan (fallback)
         return;
     }
     if (s & MD_H6) {
         current_text_scale = 1;
         // No fractional part, normal size
-        if (p && p->set_bold) p->set_bold(true);
-        if (!has_scaling) set_fg((Color){0x70, 0xA0, 0xE0});  // Light blue (fallback)
+        DAWN_BACKEND(app)->set_bold(true);
+        if (!has_scaling) set_fg((DawnColor){0x70, 0xA0, 0xE0});  // Light blue (fallback)
         return;
     }
 
     // Marked/highlighted text
     if (s & MD_MARK) {
         extern App app;
-        set_bg((Color){0xFF, 0xFF, 0x66});  // Yellow background
+        set_bg((DawnColor){0xFF, 0xFF, 0x66});  // Yellow background
         // Use theme-appropriate text color (black for light, dark for dark theme)
         if (app.theme == THEME_LIGHT) {
-            set_fg((Color){0x00, 0x00, 0x00});  // Black text
+            set_fg((DawnColor){0x00, 0x00, 0x00});  // Black text
         } else {
-            set_fg((Color){0x30, 0x30, 0x30});  // Dark gray text
+            set_fg((DawnColor){0x30, 0x30, 0x30});  // Dark gray text
         }
         return;
     }
 
     // Subscript - use dim since fractional sizing is complex
     if (s & MD_SUB) {
-        if (p && p->set_dim) p->set_dim(true);
+        DAWN_BACKEND(app)->set_dim(true);
         return;
     }
 
     // Superscript - use dim since fractional sizing is complex
     if (s & MD_SUP) {
-        if (p && p->set_dim) p->set_dim(true);
+        DAWN_BACKEND(app)->set_dim(true);
         return;
     }
 
@@ -108,32 +97,32 @@ void md_apply(MdStyle s) {
         extern App app;
         // Slightly different background for code
         if (app.theme == THEME_DARK) {
-            set_bg((Color){0x3A, 0x3A, 0x3A});  // Slightly lighter than dark bg
-            set_fg((Color){0xE0, 0x6C, 0x75});  // Reddish/pink for inline code
+            set_bg((DawnColor){0x3A, 0x3A, 0x3A});  // Slightly lighter than dark bg
+            set_fg((DawnColor){0xE0, 0x6C, 0x75});  // Reddish/pink for inline code
         } else {
-            set_bg((Color){0xE8, 0xE8, 0xE8});  // Slightly darker than light bg
-            set_fg((Color){0xC0, 0x3C, 0x45});  // Darker red for light theme
+            set_bg((DawnColor){0xE8, 0xE8, 0xE8});  // Slightly darker than light bg
+            set_fg((DawnColor){0xC0, 0x3C, 0x45});  // Darker red for light theme
         }
         return;
     }
 
     // Combinable styles
     if (s & MD_BOLD) {
-        if (p && p->set_bold) p->set_bold(true);
+        DAWN_BACKEND(app)->set_bold(true);
         // Make bold text brighter for better visibility
         extern App app;
         if (app.theme == THEME_DARK) {
-            set_fg((Color){0xFF, 0xFF, 0xFF});  // Pure white for bold in dark mode
+            set_fg((DawnColor){0xFF, 0xFF, 0xFF});  // Pure white for bold in dark mode
         } else {
-            set_fg((Color){0x00, 0x00, 0x00});  // Pure black for bold in light mode
+            set_fg((DawnColor){0x00, 0x00, 0x00});  // Pure black for bold in light mode
         }
     }
-    if (s & MD_ITALIC) { if (p && p->set_italic) p->set_italic(true); }
-    if (s & MD_UNDERLINE) { if (p && p->set_underline) p->set_underline(PLATFORM_UNDERLINE_SINGLE); }
-    if (s & MD_STRIKE) { if (p && p->set_strikethrough) p->set_strikethrough(true); }
+    if (s & MD_ITALIC) { DAWN_BACKEND(app)->set_italic(true); }
+    if (s & MD_UNDERLINE) { DAWN_BACKEND(app)->set_underline(DAWN_UNDERLINE_SINGLE); }
+    if (s & MD_STRIKE) { DAWN_BACKEND(app)->set_strike(true); }
 }
 
-int md_get_scale(MdStyle s) {
+int32_t md_get_scale(MdStyle s) {
     // Return the integer cell scale for headers
     // This is used for cell occupation calculations
     if (s & MD_H1) return 2;  // H1: 2 cells → 2.0x
@@ -146,13 +135,6 @@ int md_get_scale(MdStyle s) {
 }
 
 MdFracScale md_get_frac_scale(MdStyle s) {
-    // Refined header sizes (more subtle, traditional typography):
-    // H1: 2.0x (scale=2, no frac) - Main title
-    // H2: 1.5x (scale=2, 3/4) - Section header
-    // H3: 1.25x (scale=2, 5/8) - Subsection
-    // H4: 1.0x (scale=1, no frac) - Minor heading
-    // H5: 1.0x (scale=1, no frac) - Small heading
-    // H6: 1.0x (scale=1, no frac) - Smallest heading
     if (s & MD_H1) return (MdFracScale){2, 0, 0};
     if (s & MD_H2) return (MdFracScale){2, 3, 4};
     if (s & MD_H3) return (MdFracScale){2, 5, 8};
@@ -194,8 +176,11 @@ MdStyle md_check_delim(const GapBuffer *gb, size_t pos, size_t *dlen) {
         *dlen = 2; return MD_STRIKE;
     }
 
-    // Double equals for marked/highlighted text
+    // Triple equals for underline, double equals for highlight
     if (c == '=' && pos + 1 < len && gap_at(gb, pos+1) == '=') {
+        if (pos + 2 < len && gap_at(gb, pos+2) == '=') {
+            *dlen = 3; return MD_UNDERLINE;
+        }
         *dlen = 2; return MD_MARK;
     }
 
@@ -242,14 +227,54 @@ MdStyle md_check_delim(const GapBuffer *gb, size_t pos, size_t *dlen) {
     return 0;
 }
 
+size_t md_find_closing(const GapBuffer *gb, size_t pos, MdStyle style, size_t dlen) {
+    size_t len = gap_len(gb);
+    size_t p = pos + dlen;
+
+    // Inline code should not span newlines
+    bool allow_newlines = (style != MD_CODE);
+
+    while (p < len) {
+        char c = gap_at(gb, p);
+        if (c == '\n' && !allow_newlines) return 0;
+
+        size_t check_dlen = 0;
+        MdStyle check_style = md_check_delim(gb, p, &check_dlen);
+
+        if (check_style == style && check_dlen == dlen) {
+            return p;
+        }
+
+        if (check_dlen > 0) {
+            p += check_dlen;
+        } else {
+            p++;
+        }
+    }
+    return 0;
+}
+
 MdStyle md_check_header(const GapBuffer *gb, size_t pos) {
     // Must be at start of line
     if (pos != 0 && gap_at(gb, pos - 1) != '\n') return 0;
-    if (gap_at(gb, pos) != '#') return 0;
 
     size_t len = gap_len(gb);
-    int count = 1;
-    size_t p = pos + 1;
+    size_t p = pos;
+
+    // Skip 0-3 leading spaces or tabs
+    int32_t indent = 0;
+    while (p < len && indent < 4) {
+        char c = gap_at(gb, p);
+        if (c == ' ') { indent++; p++; }
+        else if (c == '\t') { indent += 4; p++; }  // Tab counts as up to 4 spaces
+        else break;
+    }
+    if (indent >= 4) return 0;  // 4+ spaces = indented code block
+
+    if (p >= len || gap_at(gb, p) != '#') return 0;
+
+    int32_t count = 1;
+    p++;
 
     // Count consecutive # characters (up to 6 for H1-H6)
     while (p < len && gap_at(gb, p) == '#' && count < 6) {
@@ -257,8 +282,8 @@ MdStyle md_check_header(const GapBuffer *gb, size_t pos) {
         p++;
     }
 
-    // Must be followed by space or newline
-    if (p < len && gap_at(gb, p) != ' ' && gap_at(gb, p) != '\n') {
+    // Must be followed by space, tab, or newline
+    if (p < len && gap_at(gb, p) != ' ' && gap_at(gb, p) != '\t' && gap_at(gb, p) != '\n') {
         return 0;  // Not a valid header
     }
 
@@ -273,14 +298,27 @@ MdStyle md_check_header(const GapBuffer *gb, size_t pos) {
     }
 }
 
-int md_check_header_content(const GapBuffer *gb, size_t pos, size_t *content_start) {
+int32_t md_check_header_content(const GapBuffer *gb, size_t pos, size_t *content_start) {
     // Must be at start of line
     if (pos != 0 && gap_at(gb, pos - 1) != '\n') return 0;
-    if (gap_at(gb, pos) != '#') return 0;
 
     size_t len = gap_len(gb);
-    int count = 1;
-    size_t p = pos + 1;
+    size_t p = pos;
+
+    // Skip 0-3 leading spaces or tabs
+    int32_t indent = 0;
+    while (p < len && indent < 4) {
+        char c = gap_at(gb, p);
+        if (c == ' ') { indent++; p++; }
+        else if (c == '\t') { indent += 4; p++; }
+        else break;
+    }
+    if (indent >= 4) return 0;
+
+    if (p >= len || gap_at(gb, p) != '#') return 0;
+
+    int32_t count = 1;
+    p++;
 
     // Count consecutive # characters (up to 6 for H1-H6)
     while (p < len && gap_at(gb, p) == '#' && count < 6) {
@@ -288,13 +326,13 @@ int md_check_header_content(const GapBuffer *gb, size_t pos, size_t *content_sta
         p++;
     }
 
-    // Must be followed by space or newline
-    if (p < len && gap_at(gb, p) != ' ' && gap_at(gb, p) != '\n') {
+    // Must be followed by space, tab, or newline
+    if (p < len && gap_at(gb, p) != ' ' && gap_at(gb, p) != '\t' && gap_at(gb, p) != '\n') {
         return 0;  // Not a valid header
     }
 
-    // Skip the space after #
-    if (p < len && gap_at(gb, p) == ' ') {
+    // Skip the space/tab after #
+    while (p < len && (gap_at(gb, p) == ' ' || gap_at(gb, p) == '\t')) {
         p++;
     }
 
@@ -302,8 +340,7 @@ int md_check_header_content(const GapBuffer *gb, size_t pos, size_t *content_sta
     return count;
 }
 
-bool md_check_heading_id(const GapBuffer *gb, size_t pos,
-                         size_t *id_start, size_t *id_len, size_t *total_len) {
+bool md_check_heading_id(const GapBuffer *gb, size_t pos, MdMatch *result) {
     size_t len = gap_len(gb);
     size_t p = pos;
 
@@ -322,9 +359,9 @@ bool md_check_heading_id(const GapBuffer *gb, size_t pos,
 
             if (p < len && gap_at(gb, p) == '}') {
                 // Valid heading ID found
-                *id_start = id_s;
-                *id_len = p - id_s;
-                *total_len = p - start + 1;  // Include closing }
+                result->span.start = id_s;
+                result->span.len = p - id_s;
+                result->total_len = p - start + 1;  // Include closing }
                 return true;
             }
             // No closing }, not a valid heading ID
@@ -344,10 +381,10 @@ bool md_check_heading_id(const GapBuffer *gb, size_t pos,
 //! @param pos starting position
 //! @param value output: parsed value
 //! @return number of characters consumed
-static int parse_int_from_gap(const GapBuffer *gb, size_t pos, int *value) {
+static int32_t parse_int_from_gap(const GapBuffer *gb, size_t pos, int32_t *value) {
     size_t len = gap_len(gb);
-    int v = 0;
-    int chars = 0;
+    int32_t v = 0;
+    int32_t chars = 0;
     while (pos + chars < len) {
         char c = gap_at(gb, pos + chars);
         if (c >= '0' && c <= '9') {
@@ -365,15 +402,11 @@ static int parse_int_from_gap(const GapBuffer *gb, size_t pos, int *value) {
 
 // #region Image Detection
 
-bool md_check_image(const GapBuffer *gb, size_t pos,
-                    size_t *alt_start, size_t *alt_len,
-                    size_t *path_start, size_t *path_len,
-                    int *img_width, int *img_height,
-                    size_t *total_len) {
+bool md_check_image(const GapBuffer *gb, size_t pos, MdImageAttrs *attrs) {
     size_t len = gap_len(gb);
 
-    // Use local variables to be NULL-safe
-    int _img_width = 0, _img_height = 0;
+    // Initialize attrs
+    *attrs = (MdImageAttrs){0};
 
     // Must start with ![
     if (pos + 4 >= len) return false;  // Minimum: ![](x)
@@ -381,10 +414,10 @@ bool md_check_image(const GapBuffer *gb, size_t pos,
 
     // Find closing ]
     size_t p = pos + 2;
-    size_t a_start = p;
+    attrs->alt_start = p;
     while (p < len && gap_at(gb, p) != ']' && gap_at(gb, p) != '\n') p++;
     if (p >= len || gap_at(gb, p) != ']') return false;
-    size_t a_len = p - a_start;
+    attrs->alt_len = p - attrs->alt_start;
 
     // Must be followed by (
     p++;
@@ -392,22 +425,23 @@ bool md_check_image(const GapBuffer *gb, size_t pos,
 
     // Parse URL (may have optional title after space)
     p++;
-    size_t pth_start = p;
+    attrs->path_start = p;
 
     // Find end of URL (space, quote, or closing paren)
     while (p < len && gap_at(gb, p) != ' ' && gap_at(gb, p) != ')' &&
            gap_at(gb, p) != '"' && gap_at(gb, p) != '\n') p++;
 
-    size_t pth_len = p - pth_start;
-    if (pth_len == 0) return false;  // Empty path
+    attrs->path_len = p - attrs->path_start;
+    if (attrs->path_len == 0) return false;  // Empty path
 
-    // Skip optional title: "title" or 'title'
+    // Parse optional title: "title" or 'title'
     while (p < len && gap_at(gb, p) == ' ') p++;
     if (p < len && (gap_at(gb, p) == '"' || gap_at(gb, p) == '\'')) {
         char quote = gap_at(gb, p);
         p++;  // Skip opening quote
-        // Find closing quote
+        attrs->title_start = p;
         while (p < len && gap_at(gb, p) != quote && gap_at(gb, p) != '\n') p++;
+        attrs->title_len = p - attrs->title_start;
         if (p < len && gap_at(gb, p) == quote) p++;  // Skip closing quote
         while (p < len && gap_at(gb, p) == ' ') p++;  // Skip trailing spaces
     }
@@ -436,20 +470,20 @@ bool md_check_image(const GapBuffer *gb, size_t pos,
                 p += 6;  // Skip "width="
 
                 // Parse number
-                int w = 0;
-                int consumed = parse_int_from_gap(gb, p, &w);
+                int32_t w = 0;
+                int32_t consumed = parse_int_from_gap(gb, p, &w);
                 if (consumed > 0) {
                     p += consumed;
 
                     // Check for % or px
                     if (p < len && gap_at(gb, p) == '%') {
-                        _img_width = -w;  // Negative for percentage
+                        attrs->width = -w;  // Negative for percentage
                         p++;
                     } else if (p + 1 < len && gap_at(gb, p) == 'p' && gap_at(gb, p+1) == 'x') {
-                        _img_width = w;  // Positive for pixels
+                        attrs->width = w;  // Positive for pixels
                         p += 2;
                     } else {
-                        _img_width = w;  // Default to pixels
+                        attrs->width = w;  // Default to pixels
                     }
                 }
                 continue;
@@ -464,20 +498,20 @@ bool md_check_image(const GapBuffer *gb, size_t pos,
                 p += 7;  // Skip "height="
 
                 // Parse number
-                int h = 0;
-                int consumed = parse_int_from_gap(gb, p, &h);
+                int32_t h = 0;
+                int32_t consumed = parse_int_from_gap(gb, p, &h);
                 if (consumed > 0) {
                     p += consumed;
 
                     // Check for % or px
                     if (p < len && gap_at(gb, p) == '%') {
-                        _img_height = -h;  // Negative for percentage
+                        attrs->height = -h;  // Negative for percentage
                         p++;
                     } else if (p + 1 < len && gap_at(gb, p) == 'p' && gap_at(gb, p+1) == 'x') {
-                        _img_height = h;  // Positive for pixels
+                        attrs->height = h;  // Positive for pixels
                         p += 2;
                     } else {
-                        _img_height = h;  // Default to pixels
+                        attrs->height = h;  // Default to pixels
                     }
                 }
                 continue;
@@ -493,14 +527,7 @@ bool md_check_image(const GapBuffer *gb, size_t pos,
         }
     }
 
-    // Write outputs (NULL-safe)
-    if (alt_start) *alt_start = a_start;
-    if (alt_len) *alt_len = a_len;
-    if (path_start) *path_start = pth_start;
-    if (path_len) *path_len = pth_len;
-    if (img_width) *img_width = _img_width;
-    if (img_height) *img_height = _img_height;
-    if (total_len) *total_len = p - pos;
+    attrs->total_len = p - pos;
     return true;
 }
 
@@ -508,11 +535,10 @@ bool md_check_image(const GapBuffer *gb, size_t pos,
 
 // #region Block Element Detection
 
-bool md_check_code_fence(const GapBuffer *gb, size_t pos,
-                         size_t *lang_start, size_t *lang_len) {
+bool md_check_code_fence(const GapBuffer *gb, size_t pos, MdSpan *lang) {
     size_t len = gap_len(gb);
-    *lang_start = 0;
-    *lang_len = 0;
+    lang->start = 0;
+    lang->len = 0;
 
     // Must be at start of line
     if (pos > 0 && gap_at(gb, pos - 1) != '\n') return false;
@@ -534,24 +560,21 @@ bool md_check_code_fence(const GapBuffer *gb, size_t pos,
 
     // Optional language identifier
     if (p < len && gap_at(gb, p) != '\n' && gap_at(gb, p) != ' ') {
-        *lang_start = p;
+        lang->start = p;
         while (p < len && gap_at(gb, p) != '\n' && gap_at(gb, p) != ' ') p++;
-        *lang_len = p - *lang_start;
+        lang->len = p - lang->start;
     }
 
     return true;
 }
 
-bool md_check_code_block(const GapBuffer *gb, size_t pos,
-                         size_t *lang_start, size_t *lang_len,
-                         size_t *content_start, size_t *content_len,
-                         size_t *total_len) {
+bool md_check_code_block(const GapBuffer *gb, size_t pos, MdMatch2 *result) {
     size_t len = gap_len(gb);
 
-    // Use local variables to avoid repeated NULL checks
-    size_t _lang_start = 0, _lang_len = 0;
-    size_t _content_start = 0, _content_len = 0;
-    size_t _total_len = 0;
+    // Use local variables
+    MdSpan lang = {0, 0};
+    size_t content_start = 0, content_len = 0;
+    size_t total_len = 0;
 
     // Fast-path: quick first-character check before expensive parsing
     // Skip leading whitespace and check if first non-space is backtick
@@ -565,16 +588,16 @@ bool md_check_code_block(const GapBuffer *gb, size_t pos,
     if (quick + 2 >= len) return false;  // Not enough chars for ```
 
     // Check for opening fence
-    if (!md_check_code_fence(gb, pos, &_lang_start, &_lang_len)) return false;
+    if (!md_check_code_fence(gb, pos, &lang)) return false;
 
     // Find end of opening fence line (skip leading whitespace first)
     size_t p = pos;
     while (p < len && (gap_at(gb, p) == ' ' || gap_at(gb, p) == '\t')) p++;
-    p += 3 + _lang_len;  // Skip ``` and language
+    p += 3 + lang.len;  // Skip ``` and language
     while (p < len && gap_at(gb, p) != '\n') p++;
     if (p < len) p++;  // Skip newline
 
-    _content_start = p;
+    content_start = p;
 
     // Find closing fence (allowing leading whitespace)
     while (p < len) {
@@ -589,19 +612,18 @@ bool md_check_code_block(const GapBuffer *gb, size_t pos,
             if (close_start + 2 < len &&
                 gap_at(gb, close_start) == '`' && gap_at(gb, close_start + 1) == '`' && gap_at(gb, close_start + 2) == '`') {
                 // Found closing fence
-                _content_len = p - _content_start;
+                content_len = p - content_start;
                 // Skip to end of closing fence line
                 size_t end = close_start + 3;
                 while (end < len && gap_at(gb, end) != '\n') end++;
                 if (end < len) end++;  // Include newline
-                _total_len = end - pos;
+                total_len = end - pos;
 
-                // Write outputs (NULL-safe)
-                if (lang_start) *lang_start = _lang_start;
-                if (lang_len) *lang_len = _lang_len;
-                if (content_start) *content_start = _content_start;
-                if (content_len) *content_len = _content_len;
-                if (total_len) *total_len = _total_len;
+                // Write outputs: [0]=content, [1]=lang
+                result->spans[0].start = content_start;
+                result->spans[0].len = content_len;
+                result->spans[1] = lang;
+                result->total_len = total_len;
                 return true;
             }
         }
@@ -618,41 +640,99 @@ bool md_check_hr(const GapBuffer *gb, size_t pos, size_t *rule_len) {
 
     // Must be at start of line
     if (pos > 0 && gap_at(gb, pos - 1) != '\n') return false;
-    if (pos + 2 >= len) return false;
 
-    char c = gap_at(gb, pos);
+    size_t p = pos;
+
+    // Skip 0-3 leading spaces or tabs
+    int32_t indent = 0;
+    while (p < len && indent < 4) {
+        char c = gap_at(gb, p);
+        if (c == ' ') { indent++; p++; }
+        else if (c == '\t') { indent += 4; p++; }
+        else break;
+    }
+    if (indent >= 4) return false;
+
+    if (p + 2 >= len) return false;
+
+    char c = gap_at(gb, p);
     if (c != '-' && c != '*' && c != '_') return false;
 
-    // Need at least 3 of the same character
-    if (gap_at(gb, pos + 1) != c || gap_at(gb, pos + 2) != c) return false;
-
-    // Count how many we have (can have spaces between)
-    size_t p = pos + 3;
+    // Count marker characters (can have spaces/tabs between)
+    int32_t count = 0;
     while (p < len) {
         char ch = gap_at(gb, p);
-        if (ch == c || ch == ' ') {
+        if (ch == c) {
+            count++;
+            p++;
+        } else if (ch == ' ' || ch == '\t') {
             p++;
         } else if (ch == '\n') {
-            *rule_len = p - pos;
-            return true;
+            break;
         } else {
             return false;
         }
     }
 
-    // End of buffer - still valid
+    // Need at least 3 marker characters
+    if (count < 3) return false;
+
     *rule_len = p - pos;
     return true;
 }
 
-int md_check_blockquote(const GapBuffer *gb, size_t pos, size_t *content_start) {
+int32_t md_check_setext_underline(const GapBuffer *gb, size_t pos, size_t *underline_len) {
+    size_t len = gap_len(gb);
+    *underline_len = 0;
+
+    // Must be at start of line
+    if (pos > 0 && gap_at(gb, pos - 1) != '\n') return 0;
+
+    size_t p = pos;
+
+    // Skip 0-3 leading spaces
+    int32_t indent = 0;
+    while (p < len && indent < 4 && gap_at(gb, p) == ' ') {
+        indent++;
+        p++;
+    }
+    if (indent >= 4) return 0;
+
+    if (p >= len) return 0;
+
+    char c = gap_at(gb, p);
+    if (c != '=' && c != '-') return 0;
+
+    // Count consecutive = or - characters
+    int32_t count = 0;
+    while (p < len && gap_at(gb, p) == c) {
+        count++;
+        p++;
+    }
+
+    // Must have at least 1 character (spec says 1+)
+    if (count < 1) return 0;
+
+    // Rest of line must be only spaces until newline or end
+    while (p < len && gap_at(gb, p) == ' ') p++;
+
+    if (p < len && gap_at(gb, p) != '\n') return 0;
+
+    // Include newline in length
+    if (p < len && gap_at(gb, p) == '\n') p++;
+
+    *underline_len = p - pos;
+    return (c == '=') ? 1 : 2;  // 1 = H1, 2 = H2
+}
+
+int32_t md_check_blockquote(const GapBuffer *gb, size_t pos, size_t *content_start) {
     size_t len = gap_len(gb);
     *content_start = pos;
 
     // Must be at start of line
     if (pos > 0 && gap_at(gb, pos - 1) != '\n') return 0;
 
-    int level = 0;
+    int32_t level = 0;
     size_t p = pos;
 
     // Count > characters (with optional spaces between)
@@ -676,7 +756,7 @@ int md_check_blockquote(const GapBuffer *gb, size_t pos, size_t *content_start) 
     return level;
 }
 
-int md_check_list(const GapBuffer *gb, size_t pos, size_t *content_start, int *indent) {
+int32_t md_check_list(const GapBuffer *gb, size_t pos, size_t *content_start, int32_t *indent) {
     size_t len = gap_len(gb);
     *content_start = pos;
     *indent = 0;
@@ -697,24 +777,50 @@ int md_check_list(const GapBuffer *gb, size_t pos, size_t *content_start, int *i
     char c = gap_at(gb, p);
 
     // Unordered: - * +
-    if ((c == '-' || c == '*' || c == '+') && p + 1 < len && gap_at(gb, p + 1) == ' ') {
-        *content_start = p + 2;
-        return 1;
+    // Marker can be followed by space+content, or newline (empty item), or end of buffer
+    if (c == '-' || c == '*' || c == '+') {
+        size_t marker_pos = p;
+        p++;  // Skip the marker
+        if (p >= len || gap_at(gb, p) == '\n') {
+            // Empty list item (marker at end of line or buffer)
+            *content_start = p;
+            return 1;
+        }
+        if (gap_at(gb, p) == ' ') {
+            *content_start = p + 1;
+            return 1;
+        }
+        // Not a list (e.g., "-abc" without space)
+        p = marker_pos;  // Reset
     }
 
-    // Ordered: 1. 2. etc
-    if (c >= '0' && c <= '9') {
-        while (p < len && gap_at(gb, p) >= '0' && gap_at(gb, p) <= '9') p++;
-        if (p < len && gap_at(gb, p) == '.' && p + 1 < len && gap_at(gb, p + 1) == ' ') {
-            *content_start = p + 2;
-            return 2;
+    // Ordered: 1. 2. etc (CommonMark: 1-9 digits max)
+    if (ISDIGIT_(c)) {
+        int32_t digits = 0;
+        while (p < len && ISDIGIT_(gap_at(gb, p)) && digits < 10) {
+            digits++;
+            p++;
+        }
+        // CommonMark specifies max 9 digits
+        if (digits >= 1 && digits <= 9 && p < len &&
+            (gap_at(gb, p) == '.' || gap_at(gb, p) == ')')) {
+            p++;  // Skip the . or )
+            if (p >= len || gap_at(gb, p) == '\n') {
+                // Empty ordered list item
+                *content_start = p;
+                return 2;
+            }
+            if (gap_at(gb, p) == ' ') {
+                *content_start = p + 1;
+                return 2;
+            }
         }
     }
 
     return 0;
 }
 
-int md_check_task(const GapBuffer *gb, size_t pos, size_t *content_start, int *indent) {
+int32_t md_check_task(const GapBuffer *gb, size_t pos, size_t *content_start, int32_t *indent) {
     size_t len = gap_len(gb);
     *content_start = pos;
     *indent = 0;
@@ -756,10 +862,7 @@ int md_check_task(const GapBuffer *gb, size_t pos, size_t *content_start, int *i
 
 // #region Link Detection
 
-bool md_check_link(const GapBuffer *gb, size_t pos,
-                   size_t *text_start, size_t *text_len,
-                   size_t *url_start, size_t *url_len,
-                   size_t *total_len) {
+bool md_check_link(const GapBuffer *gb, size_t pos, MdMatch2 *result) {
     size_t len = gap_len(gb);
 
     // Must start with [
@@ -788,11 +891,12 @@ bool md_check_link(const GapBuffer *gb, size_t pos,
 
     p++; // Include )
 
-    *text_start = t_start;
-    *text_len = t_len;
-    *url_start = u_start;
-    *url_len = u_len;
-    *total_len = p - pos;
+    // [0]=text, [1]=url
+    result->spans[0].start = t_start;
+    result->spans[0].len = t_len;
+    result->spans[1].start = u_start;
+    result->spans[1].len = u_len;
+    result->total_len = p - pos;
     return true;
 }
 
@@ -800,8 +904,7 @@ bool md_check_link(const GapBuffer *gb, size_t pos,
 
 // #region Footnote Detection
 
-bool md_check_footnote_ref(const GapBuffer *gb, size_t pos,
-                           size_t *id_start, size_t *id_len, size_t *total_len) {
+bool md_check_footnote_ref(const GapBuffer *gb, size_t pos, MdMatch *result) {
     size_t len = gap_len(gb);
 
     if (pos + 3 >= len) return false;
@@ -824,15 +927,13 @@ bool md_check_footnote_ref(const GapBuffer *gb, size_t pos,
     // Make sure it's not a definition (no : after ])
     if (p + 1 < len && gap_at(gb, p + 1) == ':') return false;
 
-    *id_start = i_start;
-    *id_len = p - i_start;
-    *total_len = p + 1 - pos;
+    result->span.start = i_start;
+    result->span.len = p - i_start;
+    result->total_len = p + 1 - pos;
     return true;
 }
 
-bool md_check_footnote_def(const GapBuffer *gb, size_t pos,
-                           size_t *id_start, size_t *id_len,
-                           size_t *content_start, size_t *total_len) {
+bool md_check_footnote_def(const GapBuffer *gb, size_t pos, MdMatch2 *result) {
     size_t len = gap_len(gb);
 
     // Must be at start of line
@@ -864,13 +965,15 @@ bool md_check_footnote_def(const GapBuffer *gb, size_t pos,
     // Skip optional space
     if (p < len && gap_at(gb, p) == ' ') p++;
 
-    *id_start = i_start;
-    *id_len = i_len;
-    *content_start = p;
+    // [0]=id, [1]=content (start only)
+    result->spans[0].start = i_start;
+    result->spans[0].len = i_len;
+    result->spans[1].start = p;
+    result->spans[1].len = 0;  // Content length not tracked
 
     // Total length to end of line
     while (p < len && gap_at(gb, p) != '\n') p++;
-    *total_len = p - pos;
+    result->total_len = p - pos;
 
     return true;
 }
@@ -879,9 +982,7 @@ bool md_check_footnote_def(const GapBuffer *gb, size_t pos,
 
 // #region LaTeX Math Detection
 
-bool md_check_inline_math(const GapBuffer *gb, size_t pos,
-                          size_t *content_start, size_t *content_len,
-                          size_t *total_len) {
+bool md_check_inline_math(const GapBuffer *gb, size_t pos, MdMatch *result) {
     size_t len = gap_len(gb);
 
     if (pos >= len) return false;
@@ -898,9 +999,9 @@ bool md_check_inline_math(const GapBuffer *gb, size_t pos,
         while (p + 1 < len) {
             if (gap_at(gb, p) == '\n') return false;
             if (gap_at(gb, p) == '`' && gap_at(gb, p + 1) == '$') {
-                *content_start = c_start;
-                *content_len = p - c_start;
-                *total_len = p + 2 - pos;
+                result->span.start = c_start;
+                result->span.len = p - c_start;
+                result->total_len = p + 2 - pos;
                 return true;
             }
             p++;
@@ -928,9 +1029,9 @@ bool md_check_inline_math(const GapBuffer *gb, size_t pos,
                 continue;
             }
             if (ch == '$') {
-                *content_start = c_start;
-                *content_len = p - c_start;
-                *total_len = p + 1 - pos;
+                result->span.start = c_start;
+                result->span.len = p - c_start;
+                result->total_len = p + 1 - pos;
                 return true;
             }
             p++;
@@ -947,9 +1048,9 @@ bool md_check_inline_math(const GapBuffer *gb, size_t pos,
         while (p + 1 < len) {
             if (gap_at(gb, p) == '\n') return false;
             if (gap_at(gb, p) == '\\' && gap_at(gb, p + 1) == ')') {
-                *content_start = c_start;
-                *content_len = p - c_start;
-                *total_len = p + 2 - pos;
+                result->span.start = c_start;
+                result->span.len = p - c_start;
+                result->total_len = p + 2 - pos;
                 return true;
             }
             p++;
@@ -960,8 +1061,7 @@ bool md_check_inline_math(const GapBuffer *gb, size_t pos,
     return false;
 }
 
-bool md_check_block_math(const GapBuffer *gb, size_t pos,
-                         size_t *content_start, size_t *total_len) {
+bool md_check_block_math(const GapBuffer *gb, size_t pos, MdMatch *result) {
     size_t len = gap_len(gb);
 
     // Must be at start of line
@@ -973,29 +1073,29 @@ bool md_check_block_math(const GapBuffer *gb, size_t pos,
 
     // Check for $$
     if (c == '$' && c1 == '$') {
-        *content_start = pos + 2;
+        result->span.start = pos + 2;
+        result->span.len = 0;
         // Skip to end of line
         size_t p = pos + 2;
         while (p < len && gap_at(gb, p) != '\n') p++;
-        *total_len = p - pos;
+        result->total_len = p - pos;
         return true;
     }
 
     // Check for \[
     if (c == '\\' && c1 == '[') {
-        *content_start = pos + 2;
+        result->span.start = pos + 2;
+        result->span.len = 0;
         size_t p = pos + 2;
         while (p < len && gap_at(gb, p) != '\n') p++;
-        *total_len = p - pos;
+        result->total_len = p - pos;
         return true;
     }
 
     return false;
 }
 
-bool md_check_block_math_full(const GapBuffer *gb, size_t pos,
-                              size_t *content_start, size_t *content_len,
-                              size_t *total_len) {
+bool md_check_block_math_full(const GapBuffer *gb, size_t pos, MdMatch *result) {
     size_t len = gap_len(gb);
 
     // Must be at start of line
@@ -1020,12 +1120,12 @@ bool md_check_block_math_full(const GapBuffer *gb, size_t pos,
         while (p + 1 < len && gap_at(gb, p) != '\n') {
             if (gap_at(gb, p) == '$' && gap_at(gb, p + 1) == '$') {
                 // Found closing $$ on same line
-                *content_start = c_start;
-                *content_len = p - c_start;
+                result->span.start = c_start;
+                result->span.len = p - c_start;
                 size_t close_end = p + 2;
                 while (close_end < len && gap_at(gb, close_end) != '\n') close_end++;
                 if (close_end < len) close_end++;
-                *total_len = close_end - pos;
+                result->total_len = close_end - pos;
                 return true;
             }
             p++;
@@ -1052,12 +1152,12 @@ bool md_check_block_math_full(const GapBuffer *gb, size_t pos,
                     while (close_end < len && gap_at(gb, close_end) != '\n') close_end++;
                     if (close_end < len) close_end++;
 
-                    *content_start = c_start;
-                    *content_len = p - c_start;
-                    if (*content_len > 0 && gap_at(gb, p - 1) == '\n') {
-                        (*content_len)--;
+                    result->span.start = c_start;
+                    result->span.len = p - c_start;
+                    if (result->span.len > 0 && gap_at(gb, p - 1) == '\n') {
+                        result->span.len--;
                     }
-                    *total_len = close_end - pos;
+                    result->total_len = close_end - pos;
                     return true;
                 }
             }
@@ -1079,13 +1179,13 @@ bool md_check_block_math_full(const GapBuffer *gb, size_t pos,
         size_t p = c_start;
         while (p + 1 < len) {
             if (gap_at(gb, p) == '\\' && gap_at(gb, p + 1) == ']') {
-                *content_start = c_start;
-                *content_len = p - c_start;
+                result->span.start = c_start;
+                result->span.len = p - c_start;
                 // Skip to end of line after \]
                 size_t close_end = p + 2;
                 while (close_end < len && gap_at(gb, close_end) != '\n') close_end++;
                 if (close_end < len) close_end++;
-                *total_len = close_end - pos;
+                result->total_len = close_end - pos;
                 return true;
             }
             p++;
@@ -1102,7 +1202,7 @@ bool md_check_block_math_full(const GapBuffer *gb, size_t pos,
 
 //! Check for table delimiter line: |---|---| or |:---|---:| etc.
 bool md_check_table_delimiter(const GapBuffer *gb, size_t pos,
-                              int *col_count, MdAlign *align, size_t *line_len) {
+                              int32_t *col_count, MdAlign *align, size_t *line_len) {
     size_t len = gap_len(gb);
     *col_count = 0;
     *line_len = 0;
@@ -1123,7 +1223,7 @@ bool md_check_table_delimiter(const GapBuffer *gb, size_t pos,
         p++;
     }
 
-    int cols = 0;
+    int32_t cols = 0;
 
     while (p < len && cols < MD_TABLE_MAX_COLS) {
         // Skip whitespace before cell
@@ -1134,7 +1234,7 @@ bool md_check_table_delimiter(const GapBuffer *gb, size_t pos,
         // Parse alignment specification: optional ':' + dashes + optional ':'
         bool left_colon = false;
         bool right_colon = false;
-        int dash_count = 0;
+        int32_t dash_count = 0;
 
         // Check for left colon
         if (p < len && gap_at(gb, p) == ':') {
@@ -1164,7 +1264,7 @@ bool md_check_table_delimiter(const GapBuffer *gb, size_t pos,
 
         // Determine alignment from colons
         // :--- = left, ---: = right, :---: = center, --- = default
-        int align_index = (left_colon ? 1 : 0) | (right_colon ? 2 : 0);
+        int32_t align_index = (left_colon ? 1 : 0) | (right_colon ? 2 : 0);
         static const MdAlign align_map[] = {
             MD_ALIGN_DEFAULT,  // 0: no colons
             MD_ALIGN_LEFT,     // 1: left colon only
@@ -1212,7 +1312,7 @@ bool md_check_table_delimiter(const GapBuffer *gb, size_t pos,
 
 //! Check for table header/body row line: | cell | cell |
 bool md_check_table_header(const GapBuffer *gb, size_t pos,
-                           int *col_count, size_t *line_len) {
+                           int32_t *col_count, size_t *line_len) {
     size_t len = gap_len(gb);
     *col_count = 0;
     *line_len = 0;
@@ -1239,7 +1339,7 @@ bool md_check_table_header(const GapBuffer *gb, size_t pos,
     if (!has_pipe) return false;
 
     // Count columns by counting pipes (excluding leading/trailing)
-    int pipes = 0;
+    int32_t pipes = 0;
     size_t end = p;
 
     while (end < len && gap_at(gb, end) != '\n') {
@@ -1266,7 +1366,7 @@ bool md_check_table_header(const GapBuffer *gb, size_t pos,
     }
 
     // Calculate columns
-    int cols;
+    int32_t cols;
     if (leading_pipe && trailing_pipe) {
         cols = pipes - 1;  // | a | b | c | has 4 pipes, 3 cols
     } else if (leading_pipe || trailing_pipe) {
@@ -1295,12 +1395,12 @@ bool md_check_table(const GapBuffer *gb, size_t pos, MdTable *table) {
     table->col_count = 0;
     table->row_count = 0;
     table->total_len = 0;
-    for (int i = 0; i < MD_TABLE_MAX_COLS; i++) {
+    for (int32_t i = 0; i < MD_TABLE_MAX_COLS; i++) {
         table->align[i] = MD_ALIGN_DEFAULT;
     }
 
     // Check for header row
-    int header_cols = 0;
+    int32_t header_cols = 0;
     size_t header_len = 0;
     if (!md_check_table_header(gb, pos, &header_cols, &header_len)) {
         return false;
@@ -1310,7 +1410,7 @@ bool md_check_table(const GapBuffer *gb, size_t pos, MdTable *table) {
     size_t delim_pos = pos + header_len;
     if (delim_pos >= len) return false;
 
-    int delim_cols = 0;
+    int32_t delim_cols = 0;
     MdAlign delim_align[MD_TABLE_MAX_COLS];
     size_t delim_len = 0;
     if (!md_check_table_delimiter(gb, delim_pos, &delim_cols, delim_align, &delim_len)) {
@@ -1321,16 +1421,16 @@ bool md_check_table(const GapBuffer *gb, size_t pos, MdTable *table) {
     if (header_cols != delim_cols) return false;
 
     table->col_count = delim_cols;
-    for (int i = 0; i < delim_cols && i < MD_TABLE_MAX_COLS; i++) {
+    for (int32_t i = 0; i < delim_cols && i < MD_TABLE_MAX_COLS; i++) {
         table->align[i] = delim_align[i];
     }
 
     // Count body rows
     size_t p = delim_pos + delim_len;
-    int body_rows = 0;
+    int32_t body_rows = 0;
 
     while (p < len) {
-        int row_cols = 0;
+        int32_t row_cols = 0;
         size_t row_len = 0;
         if (!md_check_table_header(gb, p, &row_cols, &row_len)) {
             break;  // Not a valid table row, end of table
@@ -1347,8 +1447,8 @@ bool md_check_table(const GapBuffer *gb, size_t pos, MdTable *table) {
 }
 
 //! Parse a table row into cell boundaries
-int md_parse_table_row(const GapBuffer *gb, size_t pos, size_t line_len,
-                       size_t *cell_starts, size_t *cell_lens, int max_cells) {
+int32_t md_parse_table_row(const GapBuffer *gb, size_t pos, size_t line_len,
+                       uint32_t *cell_starts, uint16_t *cell_lens, int32_t max_cells) {
     size_t len = gap_len(gb);
     size_t end = pos + line_len;
     if (end > len) end = len;
@@ -1357,7 +1457,7 @@ int md_parse_table_row(const GapBuffer *gb, size_t pos, size_t line_len,
     while (end > pos && gap_at(gb, end - 1) == '\n') end--;
 
     size_t p = pos;
-    int cells = 0;
+    int32_t cells = 0;
 
     // Skip leading whitespace
     while (p < end && (gap_at(gb, p) == ' ' || gap_at(gb, p) == '\t')) p++;
@@ -1384,8 +1484,8 @@ int md_parse_table_row(const GapBuffer *gb, size_t pos, size_t line_len,
         // Skip the empty cell after trailing pipe
         if (cell_start == cell_end && p >= end) break;
 
-        cell_starts[cells] = cell_start;
-        cell_lens[cells] = cell_end - cell_start;
+        cell_starts[cells] = (uint32_t)cell_start;
+        cell_lens[cells] = (uint16_t)(cell_end - cell_start);
         cells++;
 
         // Skip pipe
@@ -1396,8 +1496,8 @@ int md_parse_table_row(const GapBuffer *gb, size_t pos, size_t line_len,
 }
 
 //! Get display width of table cell content
-int md_table_cell_width(const GapBuffer *gb, size_t start, size_t len) {
-    int width = 0;
+int32_t md_table_cell_width(const GapBuffer *gb, size_t start, size_t len) {
+    int32_t width = 0;
     size_t p = start;
     size_t end = start + len;
     size_t gb_len = gap_len(gb);
@@ -1405,7 +1505,7 @@ int md_table_cell_width(const GapBuffer *gb, size_t start, size_t len) {
 
     while (p < end) {
         size_t next_pos;
-        int gw = gap_grapheme_width(gb, p, &next_pos);
+        int32_t gw = gap_grapheme_width(gb, p, &next_pos);
         if (next_pos > end) break;
         width += gw;
         p = next_pos;
@@ -1442,9 +1542,7 @@ static bool is_email_domain_char(char c) {
            (c >= '0' && c <= '9') || c == '-' || c == '.';
 }
 
-bool md_check_autolink(const GapBuffer *gb, size_t pos,
-                       size_t *url_start, size_t *url_len, size_t *total_len,
-                       bool *is_email) {
+bool md_check_autolink(const GapBuffer *gb, size_t pos, MdAutolink *result) {
     size_t len = gap_len(gb);
     if (pos >= len || gap_at(gb, pos) != '<') return false;
 
@@ -1475,10 +1573,10 @@ bool md_check_autolink(const GapBuffer *gb, size_t pos,
                         char c2 = gap_at(gb, p);
                         if (c2 == '>') {
                             // Found end
-                            *url_start = content_start;
-                            *url_len = p - content_start;
-                            *total_len = p - pos + 1;
-                            *is_email = false;
+                            result->span.start = content_start;
+                            result->span.len = p - content_start;
+                            result->total_len = p - pos + 1;
+                            result->is_email = false;
                             return true;
                         }
                         if (!is_uri_char(c2)) break;
@@ -1541,10 +1639,10 @@ bool md_check_autolink(const GapBuffer *gb, size_t pos,
     // Must end with >
     if (p >= len || gap_at(gb, p) != '>') return false;
 
-    *url_start = content_start;
-    *url_len = p - content_start;
-    *total_len = p - pos + 1;
-    *is_email = true;
+    result->span.start = content_start;
+    result->span.len = p - content_start;
+    result->total_len = p - pos + 1;
+    result->is_email = true;
     return true;
 }
 
@@ -1554,7 +1652,7 @@ bool md_check_autolink(const GapBuffer *gb, size_t pos,
 
 #include "html_entities.h"
 
-int md_check_entity(const GapBuffer *gb, size_t pos, char *utf8_out, size_t *total_len) {
+int32_t md_check_entity(const GapBuffer *gb, size_t pos, char *utf8_out, size_t *total_len) {
     size_t len = gap_len(gb);
     if (pos >= len || gap_at(gb, pos) != '&') return 0;
 
@@ -1583,7 +1681,7 @@ int md_check_entity(const GapBuffer *gb, size_t pos, char *utf8_out, size_t *tot
         if (buf_len == 0 || buf[buf_len - 1] != ';') return 0;
 
         size_t consumed;
-        int utf8_len = entity_decode_numeric(buf, buf_len, utf8_out, &consumed);
+        int32_t utf8_len = entity_decode_numeric(buf, buf_len, utf8_out, &consumed);
         if (utf8_len > 0) {
             *total_len = 2 + consumed;  // & + # + consumed chars
             return utf8_len;
@@ -1620,7 +1718,7 @@ int md_check_entity(const GapBuffer *gb, size_t pos, char *utf8_out, size_t *tot
         size_t utf8_len = strlen(utf8);
         memcpy(utf8_out, utf8, utf8_len);
         *total_len = name_len + 2;  // & + name + ;
-        return (int)utf8_len;
+        return (int32_t)utf8_len;
     }
 
     return 0;
@@ -1632,7 +1730,11 @@ int md_check_entity(const GapBuffer *gb, size_t pos, char *utf8_out, size_t *tot
 
 // Check for typographic replacements at position
 // Returns UTF-8 replacement string and number of source chars consumed
-const char *md_check_typo_replacement(const GapBuffer *gb, size_t pos, size_t *consumed) {
+// Skips replacement inside inline code (MD_CODE)
+const char *md_check_typo_replacement(const GapBuffer *gb, size_t pos, size_t *consumed, MdStyle active_style) {
+    // Skip typo replacement inside inline code
+    if (active_style & MD_CODE) return NULL;
+
     size_t len = gap_len(gb);
     if (pos >= len) return NULL;
 
@@ -1729,9 +1831,7 @@ const char *md_check_typo_replacement(const GapBuffer *gb, size_t pos, size_t *c
 
 #include "emoji_shortcodes.h"
 
-const char *md_check_emoji(const GapBuffer *gb, size_t pos,
-                           size_t *shortcode_start, size_t *shortcode_len,
-                           size_t *total_len) {
+const char *md_check_emoji(const GapBuffer *gb, size_t pos, MdMatch *result) {
     size_t len = gap_len(gb);
     if (pos >= len || gap_at(gb, pos) != ':') return NULL;
 
@@ -1765,9 +1865,9 @@ const char *md_check_emoji(const GapBuffer *gb, size_t pos,
             // Look up emoji
             const char *emoji = emoji_lookup(shortcode);
             if (emoji) {
-                *shortcode_start = start;
-                *shortcode_len = sc_len;
-                *total_len = sc_len + 2;  // Include both colons
+                result->span.start = start;
+                result->span.len = sc_len;
+                result->total_len = sc_len + 2;  // Include both colons
                 return emoji;
             }
             return NULL;  // Not a valid emoji shortcode
@@ -1788,6 +1888,53 @@ const char *md_check_emoji(const GapBuffer *gb, size_t pos,
     }
 
     return NULL;  // No closing colon found
+}
+
+// #endregion
+
+// #region Element Finding
+
+bool md_find_element_at(const GapBuffer *gb, size_t cursor, size_t *out_start, size_t *out_len) {
+    size_t len = gap_len(gb);
+    size_t scan_start = cursor > 100 ? cursor - 100 : 0;
+
+    // Check image
+    for (size_t p = scan_start; p <= cursor && p < len; p++) {
+        MdImageAttrs img;
+        if (md_check_image(gb, p, &img)) {
+            if (cursor >= p && cursor < p + img.total_len) {
+                *out_start = p; *out_len = img.total_len; return true;
+            }
+        }
+    }
+    // Check link
+    for (size_t p = scan_start; p <= cursor && p < len; p++) {
+        MdMatch2 link;
+        if (md_check_link(gb, p, &link)) {
+            if (cursor >= p && cursor < p + link.total_len) {
+                *out_start = p; *out_len = link.total_len; return true;
+            }
+        }
+    }
+    // Check footnote ref
+    for (size_t p = scan_start; p <= cursor && p < len; p++) {
+        MdMatch fn_ref;
+        if (md_check_footnote_ref(gb, p, &fn_ref)) {
+            if (cursor >= p && cursor < p + fn_ref.total_len) {
+                *out_start = p; *out_len = fn_ref.total_len; return true;
+            }
+        }
+    }
+    // Check inline math
+    for (size_t p = scan_start; p <= cursor && p < len; p++) {
+        MdMatch math;
+        if (md_check_inline_math(gb, p, &math)) {
+            if (cursor >= p && cursor < p + math.total_len) {
+                *out_start = p; *out_len = math.total_len; return true;
+            }
+        }
+    }
+    return false;
 }
 
 // #endregion

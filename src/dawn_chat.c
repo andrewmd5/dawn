@@ -17,7 +17,7 @@ void chat_add(const char *text, bool is_user) {
 }
 
 void chat_clear(void) {
-    for (int i = 0; i < app.chat_count; i++) {
+    for (int32_t i = 0; i < app.chat_count; i++) {
         free(app.chat_msgs[i].text);
     }
     free(app.chat_msgs);
@@ -73,34 +73,14 @@ static void ai_stream_cb(ai_context_t *context, const char *chunk, void *user_da
     }
 }
 
-static void get_current_time(char *buf, size_t bufsize) {
-    const PlatformBackend *p = platform_get();
-    if (p && p->get_local_time) {
-        PlatformLocalTime lt;
-        p->get_local_time(&lt);
-        snprintf(buf, bufsize, "%02d:%02d %s on %s, %s %d, %d",
-                 (lt.hour % 12) == 0 ? 12 : (lt.hour % 12),
-                 lt.min,
-                 lt.hour < 12 ? "AM" : "PM",
-                 (const char*[]){"Sunday", "Monday", "Tuesday", "Wednesday",
-                                  "Thursday", "Friday", "Saturday"}[lt.wday],
-                 (const char*[]){"January", "February", "March", "April", "May",
-                                  "June", "July", "August", "September",
-                                  "October", "November", "December"}[lt.mon],
-                 lt.mday, lt.year);
-    } else {
-        snprintf(buf, bufsize, "(time unavailable)");
-    }
-}
-
 // Tool callback for reading current document
 char *document_tool_callback(const char *params_json, void *user_data) {
     (void)user_data;
 
     cJSON *params = cJSON_Parse(params_json);
     const char *action = "full";
-    int offset = 0;
-    int length = -1;
+    int32_t offset = 0;
+    int32_t length = -1;
 
     if (params) {
         cJSON *action_obj = cJSON_GetObjectItem(params, "action");

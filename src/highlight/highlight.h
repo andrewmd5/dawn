@@ -7,7 +7,7 @@
 //! Example usage:
 //! @code
 //!     size_t len;
-//!     char *result = hl_highlight("int x = 42;", 11, "c", true, &len);
+//!     char *result = hl_highlight("int32_t x = 42;", 11, "c", true, &len);
 //!     if (result) {
 //!         printf("%s\n", result);
 //!         free(result);
@@ -21,6 +21,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "dawn_support.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,7 +32,7 @@ extern "C" {
 #define HL_VERSION_PATCH 0
 
 //! Token type enumeration matching speed-highlight's token classes
-typedef enum {
+DAWN_ENUM(uint8_t) {
     HL_TOKEN_NONE = 0,
     HL_TOKEN_DELETED,
     HL_TOKEN_ERR,
@@ -76,7 +78,7 @@ struct hl_lang_rule {
 //! Detection pattern with confidence score
 typedef struct {
     const char *pattern;
-    int score;
+    int32_t score;
 } hl_detect_rule_t;
 
 //! Language definition - array of rules defining a language
@@ -111,7 +113,7 @@ void hl_ctx_free(hl_ctx_t *ctx);
 //! @param ctx Context
 //! @param lang Language definition (must remain valid for context lifetime)
 //! @return 0 on success, -1 on failure
-int hl_ctx_register_lang(hl_ctx_t *ctx, const hl_lang_def_t *lang);
+int32_t hl_ctx_register_lang(hl_ctx_t *ctx, const hl_lang_def_t *lang);
 
 //! Set the active theme
 //! @param ctx Context
@@ -142,7 +144,7 @@ typedef void (*hl_token_cb)(const char *text, size_t len, hl_token_t token, void
 //! @param callback Function to call for each token
 //! @param user_data User data passed to callback
 //! @return 0 on success, -1 on failure
-int hl_tokenize(hl_ctx_t *ctx,
+int32_t hl_tokenize(hl_ctx_t *ctx,
                 const char *code, size_t code_len,
                 const char *lang,
                 hl_token_cb callback, void *user_data);

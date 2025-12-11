@@ -5,34 +5,29 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
+#include "dawn_types.h"
 
 // #region Argument Types
 
+//! Argument flags
+DAWN_ENUM(uint8_t) {
+    ARG_DEMO     = 1 << 0,  //!< Demo mode - replay document typing
+    ARG_PREVIEW  = 1 << 1,  //!< Read-only preview of file
+    ARG_PRINT    = 1 << 2,  //!< Print rendered document to stdout and exit
+    ARG_HELP     = 1 << 3,  //!< Show help and exit
+    ARG_VERSION  = 1 << 4,  //!< Show version and exit
+    ARG_ERROR    = 1 << 5,  //!< Parsing error occurred
+    ARG_STDIN    = 1 << 6,  //!< Read from stdin (- operand)
+} ArgFlag;
+
 //! Parsed command-line arguments
 typedef struct {
-    // File to open (positional or --file/-f)
     char *file;             //!< Path to file to open (copied to .dawn)
-
-    // Demo mode (--demo/-d)
-    bool demo_mode;         //!< Demo mode - replay document typing
     char *demo_file;        //!< File to replay in demo mode
-
-    // Render mode (--render/-r or stdin pipe)
-    bool render_mode;       //!< Render input to stdout and exit
-
-    // Preview mode (--preview/-p)
-    bool preview_mode;      //!< Read-only preview of file
-
-    // Theme (--theme/-t)
-    int theme;              //!< Theme: -1 = not set, 0 = light, 1 = dark
-
-    // Help/Version
-    bool show_help;         //!< Show help and exit
-    bool show_version;      //!< Show version and exit
-
-    // Error handling
-    bool error;             //!< Parsing error occurred
     const char *error_msg;  //!< Error message
+    int8_t theme;           //!< Theme: -1 = not set, 0 = light, 1 = dark
+    uint8_t flags;          //!< ArgFlag combination
 } DawnArgs;
 
 // #endregion
@@ -43,7 +38,7 @@ typedef struct {
 //! @param argc argument count from main
 //! @param argv argument vector from main
 //! @return parsed arguments structure
-DawnArgs args_parse(int argc, char *argv[]);
+DawnArgs args_parse(int32_t argc, char *argv[]);
 
 //! Free resources allocated by args_parse
 //! @param args pointer to arguments structure
@@ -65,6 +60,11 @@ void args_print_version(void);
 //! Check if stdin has data (for pipe detection)
 //! @return true if stdin is a pipe with data
 bool args_stdin_has_data(void);
+
+//! Read all content from stdin
+//! @param out_size pointer to store the size of returned buffer
+//! @return newly allocated buffer with stdin content, or NULL on error
+char *args_read_stdin(size_t *out_size);
 
 // #endregion
 

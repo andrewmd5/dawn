@@ -10,15 +10,13 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <limits.h>
 
 // #endregion
 
-// #region Platform Abstraction
+// #region Backend Abstraction
 
-#include "platform.h"
-
-// Re-export platform Color type for compatibility
-typedef PlatformColor Color;
+#include "dawn_backend.h"
 
 // #endregion
 
@@ -70,7 +68,7 @@ typedef PlatformColor Color;
 #define AI_INPUT_MAX_LINES 6
 
 //! Timer preset options (minutes)
-static const int TIMER_PRESETS[] = { 0, 5, 10, 15, 20, 25, 30 };
+static const int32_t TIMER_PRESETS[] = { 0, 5, 10, 15, 20, 25, 30 };
 #define NUM_PRESETS (sizeof(TIMER_PRESETS) / sizeof(TIMER_PRESETS[0]))
 
 // #endregion
@@ -87,7 +85,7 @@ typedef struct {
 } GapBuffer;
 
 //! Application mode/screen
-typedef enum {
+DAWN_ENUM(uint8_t) {
     MODE_WELCOME,       //!< Start screen
     MODE_WRITING,       //!< Main editor
     MODE_TIMER_SELECT,  //!< Timer configuration
@@ -96,7 +94,7 @@ typedef enum {
     MODE_FINISHED,      //!< Timer completed screen
     MODE_TITLE_EDIT,    //!< Document title editor (modal)
     MODE_HELP,          //!< Keyboard shortcuts help
-    MODE_IMAGE_EDIT,    //!< Image dimension editor (modal)
+    MODE_BLOCK_EDIT,    //!< Block editor (modal) - images, etc.
     MODE_TOC,           //!< Table of contents navigation (modal)
     MODE_SEARCH         //!< Document search (modal)
 } AppMode;
@@ -107,14 +105,14 @@ typedef enum {
 //! Pop back to previous mode
 #define MODE_POP() do { app.mode = app.prev_mode; } while(0)
 
-//! Color theme
-typedef enum {
+//! DawnColor theme
+DAWN_ENUM(uint8_t) {
     THEME_LIGHT,
     THEME_DARK
 } Theme;
 
 //! Writing style (visual presentation)
-typedef enum {
+DAWN_ENUM(uint8_t) {
     STYLE_MINIMAL,      //!< Clean, minimal UI
     STYLE_TYPEWRITER,   //!< Monospace feel
     STYLE_ELEGANT       //!< Italic, refined
@@ -136,68 +134,14 @@ typedef struct {
 
 // #endregion
 
-// #region Key Codes (Platform-Independent Mapping)
-
-//! Extended key codes for special keys
-//! These map to platform key codes
-enum {
-    KEY_NONE = PLATFORM_KEY_NONE,
-    KEY_ESC = 0x1b,
-
-    // Arrow keys
-    KEY_UP = PLATFORM_KEY_UP,
-    KEY_DOWN = PLATFORM_KEY_DOWN,
-    KEY_RIGHT = PLATFORM_KEY_RIGHT,
-    KEY_LEFT = PLATFORM_KEY_LEFT,
-
-    // Navigation
-    KEY_HOME = PLATFORM_KEY_HOME,
-    KEY_END = PLATFORM_KEY_END,
-    KEY_PGUP = PLATFORM_KEY_PGUP,
-    KEY_PGDN = PLATFORM_KEY_PGDN,
-    KEY_DEL = PLATFORM_KEY_DEL,
-
-    // Shift+Arrow (selection)
-    KEY_SHIFT_UP = PLATFORM_KEY_SHIFT_UP,
-    KEY_SHIFT_DOWN = PLATFORM_KEY_SHIFT_DOWN,
-    KEY_SHIFT_LEFT = PLATFORM_KEY_SHIFT_LEFT,
-    KEY_SHIFT_RIGHT = PLATFORM_KEY_SHIFT_RIGHT,
-
-    // Ctrl+Arrow (word movement)
-    KEY_CTRL_LEFT = PLATFORM_KEY_CTRL_LEFT,
-    KEY_CTRL_RIGHT = PLATFORM_KEY_CTRL_RIGHT,
-    KEY_CTRL_SHIFT_LEFT = PLATFORM_KEY_CTRL_SHIFT_LEFT,
-    KEY_CTRL_SHIFT_RIGHT = PLATFORM_KEY_CTRL_SHIFT_RIGHT,
-
-    // Alt+Arrow (word movement on macOS)
-    KEY_ALT_LEFT = PLATFORM_KEY_ALT_LEFT,
-    KEY_ALT_RIGHT = PLATFORM_KEY_ALT_RIGHT,
-    KEY_ALT_SHIFT_LEFT = PLATFORM_KEY_ALT_SHIFT_LEFT,
-    KEY_ALT_SHIFT_RIGHT = PLATFORM_KEY_ALT_SHIFT_RIGHT,
-
-    // Alt+Up/Down (half-screen movement)
-    KEY_ALT_UP = PLATFORM_KEY_ALT_UP,
-    KEY_ALT_DOWN = PLATFORM_KEY_ALT_DOWN,
-
-    // Ctrl+Home/End (document start/end)
-    KEY_CTRL_HOME = PLATFORM_KEY_CTRL_HOME,
-    KEY_CTRL_END = PLATFORM_KEY_CTRL_END,
-
-    // Mouse
-    KEY_MOUSE_SCROLL_UP = PLATFORM_KEY_MOUSE_SCROLL_UP,
-    KEY_MOUSE_SCROLL_DOWN = PLATFORM_KEY_MOUSE_SCROLL_DOWN,
-    KEY_MOUSE_CLICK = PLATFORM_KEY_MOUSE_CLICK,
-
-    // Special
-    KEY_BTAB = PLATFORM_KEY_BTAB  //!< Shift+Tab (backtab)
-};
-
-// #endregion
 
 // #region Application State
 
 //! Global application state
 typedef struct {
+    // Backend context
+    DawnCtx ctx;
+
     // Document
     GapBuffer text;     //!< Document content
     size_t cursor;      //!< Cursor position in text
@@ -207,10 +151,10 @@ typedef struct {
     size_t sel_anchor;  //!< Selection start position
 
     // Viewport
-    int scroll_y;       //!< Vertical scroll offset
+    int32_t scroll_y;       //!< Vertical scroll offset
 
     // Timer
-    int timer_mins;     //!< Timer duration in minutes
+    int32_t timer_mins;     //!< Timer duration in minutes
     int64_t timer_start; //!< Timer start timestamp
     int64_t timer_paused_at; //!< Pause timestamp
     bool timer_on;      //!< Timer running
@@ -220,20 +164,20 @@ typedef struct {
     // UI State
     AppMode mode;       //!< Current screen/mode
     AppMode prev_mode;  //!< Previous mode (for modal return)
-    Theme theme;        //!< Color theme
+    Theme theme;        //!< DawnColor theme
     WritingStyle style; //!< Writing style
-    int preset_idx;     //!< Selected timer preset index
+    int32_t preset_idx;     //!< Selected timer preset index
     bool focus_mode;    //!< Focus mode enabled
     bool plain_mode;    //!< Plain text mode (no WYSIWYG rendering)
     bool preview_mode;  //!< Read-only preview mode
 
     // Display
-    int rows, cols;     //!< Display dimensions
+    int32_t rows, cols;     //!< Display dimensions
 
     // History
     HistoryEntry *history;  //!< Document history array
-    int hist_count;         //!< Number of history entries
-    int hist_sel;           //!< Selected history index
+    int32_t hist_count;         //!< Number of history entries
+    int32_t hist_sel;           //!< Selected history index
 
     // Current Session
     char *session_path;     //!< Path to current document
@@ -242,16 +186,29 @@ typedef struct {
     size_t title_edit_len;    //!< Title edit length
     size_t title_edit_cursor; //!< Title edit cursor
 
-    // Image Edit
-    size_t img_edit_pos;      //!< Position of image being edited
-    size_t img_edit_total_len; //!< Total length of image syntax
-    char img_edit_width_buf[16];  //!< Width edit buffer
-    char img_edit_height_buf[16]; //!< Height edit buffer
-    size_t img_edit_width_len;    //!< Width buffer length
-    size_t img_edit_height_len;   //!< Height buffer length
-    int img_edit_field;       //!< 0 = width, 1 = height
-    bool img_edit_width_pct;  //!< Width is percentage
-    bool img_edit_height_pct; //!< Height is percentage
+    // Block Edit State
+    struct {
+        int8_t type;          //!< BlockType being edited
+        size_t pos;           //!< Position of block in text
+        size_t len;           //!< Total length of block syntax
+        int32_t field;        //!< Current field index
+        union {
+            struct {
+                char alt[256];
+                char title[256];
+                char width[16];
+                char height[16];
+                size_t alt_len;
+                size_t title_len;
+                size_t width_len;
+                size_t height_len;
+                bool width_pct;
+                bool height_pct;
+            } image;
+            // Future: struct { ... } code;
+            // Future: struct { ... } link;
+        };
+    } block_edit;
 
     // AI Chat
     bool ai_open;           //!< AI panel visible
@@ -260,8 +217,8 @@ typedef struct {
     size_t ai_input_len;    //!< AI input length
     size_t ai_input_cursor; //!< AI input cursor
     ChatMessage *chat_msgs; //!< Chat history
-    int chat_count;         //!< Number of messages
-    int chat_scroll;        //!< Chat scroll offset
+    int32_t chat_count;         //!< Number of messages
+    int32_t chat_scroll;        //!< Chat scroll offset
     bool ai_thinking;       //!< AI processing request
 
     #if HAS_LIBAI
@@ -277,8 +234,8 @@ typedef struct {
         size_t text_len;    //!< Length of saved text
         size_t cursor;      //!< Cursor position
     } undo_stack[MAX_UNDO];
-    int undo_count;         //!< Number of undo states
-    int undo_pos;           //!< Current position in undo stack
+    int32_t undo_count;         //!< Number of undo states
+    int32_t undo_pos;           //!< Current position in undo stack
 
     // State flags
     bool resize_needed;     //!< Display resize pending

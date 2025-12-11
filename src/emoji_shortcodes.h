@@ -1993,7 +1993,7 @@ static inline const char* emoji_lookup(const char *shortcode) {
     size_t lo = 0, hi = EMOJI_TABLE_SIZE;
     while (lo < hi) {
         size_t mid = lo + (hi - lo) / 2;
-        int cmp = strcmp(emoji_table[mid].shortcode, shortcode);
+        int32_t cmp = strcmp(emoji_table[mid].shortcode, shortcode);
         if (cmp == 0) return emoji_table[mid].unicode;
         if (cmp < 0) lo = mid + 1;
         else hi = mid;

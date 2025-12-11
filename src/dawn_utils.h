@@ -4,6 +4,7 @@
 #define DAWN_UTILS_H
 
 #include "dawn_types.h"
+#include "dawn_md.h"
 
 // #region Character Classification (ASCII)
 
@@ -44,7 +45,7 @@ size_t normalize_line_endings(char *buf, size_t len);
 //! Count words in a gap buffer (uses cache for performance)
 //! @param gb gap buffer containing text
 //! @return number of words
-int count_words(const GapBuffer *gb);
+int32_t count_words(const GapBuffer *gb);
 
 //! Invalidate word count cache (call when text changes)
 void word_count_invalidate(void);
@@ -55,29 +56,30 @@ void word_count_invalidate(void);
 
 //! Current text scale for output (1-7, 1=normal)
 //! Set by md_apply for headers, used by output_grapheme
-extern int current_text_scale;
+extern int32_t current_text_scale;
 
 //! Current fractional scale numerator (0-15, 0 = no fraction)
 //! Set by md_apply for headers using fractional scaling
-extern int current_frac_num;
+extern int32_t current_frac_num;
 
 //! Current fractional scale denominator (0-15, must be > num when non-zero)
 //! Set by md_apply for headers using fractional scaling
-extern int current_frac_denom;
+extern int32_t current_frac_denom;
 
 //! Output a single grapheme from a gap buffer, advancing position
 //! Uses current_text_scale for text sizing if terminal supports it
 //! @param gb gap buffer to read from
 //! @param pos position pointer (advanced past the grapheme)
+//! @param active_style current inline style (passed to typo replacement check)
 //! @return display width of the grapheme (multiplied by scale)
-int output_grapheme(const GapBuffer *gb, size_t *pos);
+int32_t output_grapheme(const GapBuffer *gb, size_t *pos, MdStyle active_style);
 
 //! Output a single grapheme from a string, advancing position
 //! @param text string to read from
 //! @param len length of string
 //! @param pos position pointer (advanced past the grapheme)
 //! @return display width of the grapheme
-int output_grapheme_str(const char *text, size_t len, size_t *pos);
+int32_t output_grapheme_str(const char *text, size_t len, size_t *pos);
 
 // #endregion
 
@@ -89,7 +91,7 @@ int output_grapheme_str(const char *text, size_t len, size_t *pos);
 //! @param start starting position
 //! @param width maximum width
 //! @return number of characters that fit, -1 for empty line, 0 for end
-int chat_wrap_line(const char *text, size_t len, size_t start, int width);
+int32_t chat_wrap_line(const char *text, size_t len, size_t start, int32_t width);
 
 // #endregion
 

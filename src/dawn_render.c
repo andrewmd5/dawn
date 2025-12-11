@@ -1,8 +1,10 @@
 // dawn_render.c
 
 #include "dawn_render.h"
+#include "dawn_block.h"
 #include "dawn_gap.h"
 #include "dawn_image.h"
+#include "dawn_modal.h"
 #include "dawn_theme.h"
 #include "dawn_timer.h"
 #include "dawn_utils.h"
@@ -14,45 +16,27 @@
 // #region Platform Output Helpers
 
 static void platform_write_str(const char *str) {
-    const PlatformBackend *p = platform_get();
-    if (p && p->write_str) {
-        p->write_str(str, strlen(str));
-    }
+    DAWN_BACKEND(app)->write_str(str, strlen(str));
 }
 
 static void platform_write_char(char c) {
-    const PlatformBackend *p = platform_get();
-    if (p && p->write_char) {
-        p->write_char(c);
-    }
+    DAWN_BACKEND(app)->write_char(c);
 }
 
 static void platform_clear_screen(void) {
-    const PlatformBackend *p = platform_get();
-    if (p && p->clear_screen) {
-        p->clear_screen();
-    }
+    DAWN_BACKEND(app)->clear_screen();
 }
 
 static void platform_set_cursor_visible(bool visible) {
-    const PlatformBackend *p = platform_get();
-    if (p && p->set_cursor_visible) {
-        p->set_cursor_visible(visible);
-    }
+    DAWN_BACKEND(app)->set_cursor_visible(visible);
 }
 
 static void platform_set_bold(bool enabled) {
-    const PlatformBackend *p = platform_get();
-    if (p && p->set_bold) {
-        p->set_bold(enabled);
-    }
+    DAWN_BACKEND(app)->set_bold(enabled);
 }
 
 static void platform_reset_attrs(void) {
-    const PlatformBackend *p = platform_get();
-    if (p && p->reset_attrs) {
-        p->reset_attrs();
-    }
+    DAWN_BACKEND(app)->reset_attrs();
 }
 
 // #endregion
@@ -62,46 +46,46 @@ static void platform_reset_attrs(void) {
 void render_clear(void) {
     set_bg(get_bg());
     platform_clear_screen();
-    for (int r = 0; r < app.rows; r++) {
+    for (int32_t r = 0; r < app.rows; r++) {
         move_to(r + 1, 1);
-        for (int c = 0; c < app.cols; c++) platform_write_char(' ');
+        for (int32_t c = 0; c < app.cols; c++) platform_write_char(' ');
     }
 }
 
-void render_center_text(int row, const char *text, Color fg) {
-    int len = (int)strlen(text);
-    int col = (app.cols - len) / 2;
+void render_center_text(int32_t row, const char *text, DawnColor fg) {
+    int32_t len = (int32_t)strlen(text);
+    int32_t col = (app.cols - len) / 2;
     if (col < 1) col = 1;
     move_to(row, col);
     set_fg(fg);
     platform_write_str(text);
 }
 
-void render_popup_box(int width, int height, int *out_top, int *out_left) {
-    int top = (app.rows - height) / 2;
-    int left = (app.cols - width) / 2;
+void render_popup_box(int32_t width, int32_t height, int32_t *out_top, int32_t *out_left) {
+    int32_t top = (app.rows - height) / 2;
+    int32_t left = (app.cols - width) / 2;
     if (top < 1) top = 1;
     if (left < 1) left = 1;
 
-    Color bg = get_modal_bg();
+    DawnColor bg = get_modal_bg();
     image_mask_region(left, top, width, height, bg);
-    Color border = get_border();
+    DawnColor border = get_border();
 
     // Top border
     move_to(top, left);
     set_bg(bg);
     set_fg(border);
     platform_write_str("╭");
-    for (int i = 0; i < width - 2; i++) platform_write_str("─");
+    for (int32_t i = 0; i < width - 2; i++) platform_write_str("─");
     platform_write_str("╮");
 
     // Middle rows
-    for (int r = 1; r < height - 1; r++) {
+    for (int32_t r = 1; r < height - 1; r++) {
         move_to(top + r, left);
         set_fg(border);
         platform_write_str("│");
         set_fg(get_fg());
-        for (int i = 0; i < width - 2; i++) platform_write_char(' ');
+        for (int32_t i = 0; i < width - 2; i++) platform_write_char(' ');
         set_fg(border);
         platform_write_str("│");
     }
@@ -110,7 +94,7 @@ void render_popup_box(int width, int height, int *out_top, int *out_left) {
     move_to(top + height - 1, left);
     set_fg(border);
     platform_write_str("╰");
-    for (int i = 0; i < width - 2; i++) platform_write_str("─");
+    for (int32_t i = 0; i < width - 2; i++) platform_write_str("─");
     platform_write_str("╯");
 
     if (out_top) *out_top = top;
@@ -121,7 +105,7 @@ void render_popup_box(int width, int height, int *out_top, int *out_left) {
 
 // #region Screen Renderers
 
-static void render_text_at(int row, int col, const char *text, Color fg) {
+static void render_text_at(int32_t row, int32_t col, const char *text, DawnColor fg) {
     move_to(row, col);
     set_fg(fg);
     platform_write_str(text);
@@ -131,32 +115,32 @@ void render_welcome(void) {
     render_clear();
 
     // Use most of the available space
-    int margin_h = app.cols > 100 ? 8 : (app.cols > 60 ? 4 : 2);
-    int margin_v = app.rows > 30 ? 3 : 2;
-    int content_left = margin_h + 1;
-    int content_right = app.cols - margin_h;
-    int content_width = content_right - content_left;
+    int32_t margin_h = app.cols > 100 ? 8 : (app.cols > 60 ? 4 : 2);
+    int32_t margin_v = app.rows > 30 ? 3 : 2;
+    int32_t content_left = margin_h + 1;
+    int32_t content_right = app.cols - margin_h;
+    int32_t content_width = content_right - content_left;
 
     // Vertical layout
-    int top_row = margin_v + 1;
-    int bottom_row = app.rows - margin_v;
-    int center_row = (top_row + bottom_row) / 2;
+    int32_t top_row = margin_v + 1;
+    int32_t bottom_row = app.rows - margin_v;
+    int32_t center_row = (top_row + bottom_row) / 2;
 
     // Clean block letter logo
     static const char *logo[] = {
         "█▀▄ ▄▀█ █ █ █ █▄ █",
         "█▄▀ █▀█ ▀▄▀▄▀ █ ▀█",
     };
-    int logo_height = 2;
-    int logo_width = 19;
+    int32_t logo_height = 2;
+    int32_t logo_width = 19;
 
     // Center logo vertically - position it above center
-    int logo_start = center_row - logo_height - 2;
+    int32_t logo_start = center_row - logo_height - 2;
     if (logo_start < top_row) logo_start = top_row;
 
     set_fg(get_fg());
-    for (int i = 0; i < logo_height; i++) {
-        int col = (app.cols - logo_width) / 2;
+    for (int32_t i = 0; i < logo_height; i++) {
+        int32_t col = (app.cols - logo_width) / 2;
         if (col < 1) col = 1;
         move_to(logo_start + i, col);
         platform_write_str(logo[i]);
@@ -166,13 +150,13 @@ void render_welcome(void) {
     render_center_text(logo_start + logo_height + 1, "draft anything, write now", get_dim());
 
     // Actions grid - positioned below center
-    int actions_row = center_row + 2;
-    int col1 = content_left + content_width / 4 - 8;
-    int col2 = content_left + content_width / 2 + content_width / 4 - 8;
+    int32_t actions_row = center_row + 2;
+    int32_t col1 = content_left + content_width / 4 - 8;
+    int32_t col2 = content_left + content_width / 2 + content_width / 4 - 8;
     if (col1 < content_left + 2) col1 = content_left + 2;
     if (col2 < col1 + 20) col2 = col1 + 20;
 
-    int row = actions_row;
+    int32_t row = actions_row;
     render_text_at(row, col1, "enter", get_accent());
     render_text_at(row, col1 + 6, " write", get_dim());
     render_text_at(row, col2, "h", get_accent());
@@ -212,7 +196,7 @@ void render_welcome(void) {
 
     // Right: theme
     const char *theme_str = app.theme == THEME_DARK ? "dark" : "light";
-    int theme_col = content_right - (int)strlen(theme_str);
+    int32_t theme_col = content_right - (int32_t)strlen(theme_str);
     move_to(bottom_row, theme_col);
     set_fg(get_dim());
     platform_write_str(theme_str);
@@ -220,7 +204,7 @@ void render_welcome(void) {
 
 void render_timer_select(void) {
     render_clear();
-    int cy = app.rows / 2;
+    int32_t cy = app.rows / 2;
 
     render_center_text(cy - 5, "select timer", get_fg());
 
@@ -228,16 +212,16 @@ void render_timer_select(void) {
         char buf[32];
         if (TIMER_PRESETS[i] == 0) {
             snprintf(buf, sizeof(buf), "%s no timer %s",
-                     (int)i == app.preset_idx ? ">" : " ",
-                     (int)i == app.preset_idx ? "<" : " ");
+                     (int32_t)i == app.preset_idx ? ">" : " ",
+                     (int32_t)i == app.preset_idx ? "<" : " ");
         } else {
             snprintf(buf, sizeof(buf), "%s %d min %s",
-                     (int)i == app.preset_idx ? ">" : " ",
+                     (int32_t)i == app.preset_idx ? ">" : " ",
                      TIMER_PRESETS[i],
-                     (int)i == app.preset_idx ? "<" : " ");
+                     (int32_t)i == app.preset_idx ? "<" : " ");
         }
-        render_center_text(cy - 2 + (int)i, buf,
-                    (int)i == app.preset_idx ? get_accent() : get_dim());
+        render_center_text(cy - 2 + (int32_t)i, buf,
+                    (int32_t)i == app.preset_idx ? get_accent() : get_dim());
     }
 
     render_center_text(app.rows - 2, "[j/k] select   [enter] confirm   [esc] back", get_dim());
@@ -245,20 +229,20 @@ void render_timer_select(void) {
 
 void render_style_select(void) {
     render_clear();
-    int cy = app.rows / 2;
+    int32_t cy = app.rows / 2;
 
     render_center_text(cy - 4, "select style", get_fg());
 
     const char *names[] = {"minimal", "typewriter", "elegant"};
     const char *descs[] = {"clean focus", "monospace feel", "italic grace"};
 
-    for (int i = 0; i < 3; i++) {
+    for (int32_t i = 0; i < 3; i++) {
         char buf[32];
         snprintf(buf, sizeof(buf), "%s %s %s",
-                 i == (int)app.style ? ">" : " ",
+                 i == (int32_t)app.style ? ">" : " ",
                  names[i],
-                 i == (int)app.style ? "<" : " ");
-        render_center_text(cy - 1 + i * 2, buf, i == (int)app.style ? get_accent() : get_dim());
+                 i == (int32_t)app.style ? "<" : " ");
+        render_center_text(cy - 1 + i * 2, buf, i == (int32_t)app.style ? get_accent() : get_dim());
         render_center_text(cy + i * 2, descs[i], get_dim());
     }
 
@@ -266,13 +250,13 @@ void render_style_select(void) {
 }
 
 void render_help(void) {
-    int width = 44;
-    int height = 26;
-    int top, left;
+    int32_t width = 44;
+    int32_t height = 26;
+    int32_t top, left;
     render_popup_box(width, height, &top, &left);
 
-    int col1 = left + 4;
-    int col2 = left + 20;
+    int32_t col1 = left + 4;
+    int32_t col2 = left + 20;
 
     set_bg(get_modal_bg());
 
@@ -284,7 +268,7 @@ void render_help(void) {
     platform_reset_attrs();
     set_bg(get_modal_bg());
 
-    int cy = top + 4;
+    int32_t cy = top + 4;
     move_to(cy++, col1);
     set_fg(get_accent());
     platform_set_bold(true);
@@ -363,12 +347,12 @@ void render_history(void) {
     set_fg(get_fg());
     platform_write_str("history");
 
-    int visible = app.rows - 6;
-    int start = 0;
+    int32_t visible = app.rows - 6;
+    int32_t start = 0;
     if (app.hist_sel >= visible) start = app.hist_sel - visible + 1;
 
-    for (int i = 0; i < visible && start + i < app.hist_count; i++) {
-        int idx = start + i;
+    for (int32_t i = 0; i < visible && start + i < app.hist_count; i++) {
+        int32_t idx = start + i;
         HistoryEntry *entry = &app.history[idx];
 
         move_to(4 + i, 4);
@@ -396,24 +380,23 @@ void render_history(void) {
 
 void render_finished(void) {
     render_clear();
-    int cy = app.rows / 2;
+    int32_t cy = app.rows / 2;
 
     render_center_text(cy - 3, "done.", get_fg());
     render_center_text(cy - 1, "your writing is saved.", get_dim());
 
-    int words = count_words(&app.text);
+    int32_t words = count_words(&app.text);
 
     char stats[64];
     if (app.timer_start > 0) {
-        const PlatformBackend *p = platform_get();
-        int64_t now = p && p->time_now ? p->time_now() : 0;
+        int64_t now = DAWN_BACKEND(app)->now();
         int64_t elapsed_secs;
         if (app.timer_paused) {
             elapsed_secs = app.timer_mins * 60 - app.timer_paused_at;
         } else {
             elapsed_secs = now - app.timer_start;
         }
-        int elapsed_mins = (int)(elapsed_secs / 60);
+        int32_t elapsed_mins = (int32_t)(elapsed_secs / 60);
         if (elapsed_mins < 1) elapsed_mins = 1;
         snprintf(stats, sizeof(stats), "%d words in %d min", words, elapsed_mins);
     } else {
@@ -431,14 +414,14 @@ void render_finished(void) {
 }
 
 void render_title_edit(void) {
-    int box_width = 50;
-    int box_height = 7;
-    int top, left;
+    int32_t box_width = 50;
+    int32_t box_height = 7;
+    int32_t top, left;
 
     render_popup_box(box_width, box_height, &top, &left);
 
-    int content_left = left + 2;
-    int content_top = top + 1;
+    int32_t content_left = left + 2;
+    int32_t content_top = top + 1;
 
     set_bg(get_modal_bg());
 
@@ -448,7 +431,7 @@ void render_title_edit(void) {
     platform_write_str("Set Title");
 
     // Input field
-    int input_row = content_top + 2;
+    int32_t input_row = content_top + 2;
     move_to(input_row, content_left);
     set_fg(get_accent());
     platform_write_str("> ");
@@ -463,66 +446,34 @@ void render_title_edit(void) {
     platform_write_str("enter:save  esc:cancel");
 
     // Position cursor
-    move_to(input_row, content_left + 2 + (int)app.title_edit_cursor);
+    move_to(input_row, content_left + 2 + (int32_t)app.title_edit_cursor);
     platform_set_cursor_visible(true);
 }
 
-void render_image_edit(void) {
-    int box_width = 50;
-    int box_height = 9;
-    int top, left;
+static void render_block_edit_image(void) {
+    MODAL_BEGIN("Edit Image", 60, 13);
 
-    render_popup_box(box_width, box_height, &top, &left);
+    MODAL_TEXT_FIELD(0, "Alt:    ", app.block_edit.image.alt,
+                     app.block_edit.image.alt_len, _modal_content_width - 10, 0);
+    MODAL_TEXT_FIELD(1, "Title:  ", app.block_edit.image.title,
+                     app.block_edit.image.title_len, _modal_content_width - 10, 1);
 
-    int content_left = left + 2;
-    int content_top = top + 1;
+    MODAL_SIZE_FIELD(3, "Width:  ", app.block_edit.image.width,
+                     app.block_edit.image.width_len, app.block_edit.image.width_pct, 2);
+    MODAL_SIZE_FIELD(4, "Height: ", app.block_edit.image.height,
+                     app.block_edit.image.height_len, app.block_edit.image.height_pct, 3);
 
-    set_bg(get_modal_bg());
+    MODAL_HELP(9, "tab:field  p:%/px  enter:save  esc:cancel");
 
-    // Title
-    move_to(content_top, content_left);
-    set_fg(get_dim());
-    platform_write_str("Edit Image Dimensions");
+    MODAL_END();
+}
 
-    // Width field
-    int field_row = content_top + 2;
-    move_to(field_row, content_left);
-    set_fg(app.img_edit_field == 0 ? get_accent() : get_dim());
-    platform_write_str("Width:  ");
-    set_fg(get_fg());
-
-    for (size_t i = 0; i < app.img_edit_width_len; i++) {
-        platform_write_char(app.img_edit_width_buf[i]);
+void render_block_edit(void) {
+    switch (app.block_edit.type) {
+        case BLOCK_IMAGE: render_block_edit_image(); break;
+        // Future: case BLOCK_CODE: render_block_edit_code(); break;
+        default: break;
     }
-    set_fg(get_dim());
-    if (app.img_edit_width_pct) platform_write_str("%");
-    else platform_write_str("px");
-
-    // Height field
-    move_to(field_row + 1, content_left);
-    set_fg(app.img_edit_field == 1 ? get_accent() : get_dim());
-    platform_write_str("Height: ");
-    set_fg(get_fg());
-
-    for (size_t i = 0; i < app.img_edit_height_len; i++) {
-        platform_write_char(app.img_edit_height_buf[i]);
-    }
-    set_fg(get_dim());
-    if (app.img_edit_height_pct) platform_write_str("%");
-    else platform_write_str("px");
-
-    // Help text
-    move_to(content_top + 5, content_left);
-    set_fg(get_dim());
-    platform_write_str("tab:field  p:%/px  enter:save  esc:cancel");
-
-    // Position cursor
-    if (app.img_edit_field == 0) {
-        move_to(field_row, content_left + 8 + (int)app.img_edit_width_len);
-    } else {
-        move_to(field_row + 1, content_left + 8 + (int)app.img_edit_height_len);
-    }
-    platform_set_cursor_visible(true);
 }
 
 void render_toc(void) {
@@ -530,18 +481,18 @@ void render_toc(void) {
     if (!toc) return;
 
     // Calculate dimensions
-    int width = app.cols > 80 ? 70 : app.cols - 6;
-    int max_height = app.rows - 6;
-    int list_height = max_height - 7;  // Space for header, filter, footer
+    int32_t width = app.cols > 80 ? 70 : app.cols - 6;
+    int32_t max_height = app.rows - 6;
+    int32_t list_height = max_height - 7;  // Space for header, filter, footer
     if (list_height < 3) list_height = 3;
-    int height = list_height + 7;
+    int32_t height = list_height + 7;
 
-    int top, left;
+    int32_t top, left;
     render_popup_box(width, height, &top, &left);
 
-    int content_left = left + 3;
-    int content_right = left + width - 3;
-    int content_width = content_right - content_left;
+    int32_t content_left = left + 3;
+    int32_t content_right = left + width - 3;
+    int32_t content_width = content_right - content_left;
 
     set_bg(get_modal_bg());
 
@@ -554,12 +505,12 @@ void render_toc(void) {
     set_bg(get_modal_bg());
 
     // Filter input
-    int filter_row = top + 4;
+    int32_t filter_row = top + 4;
     move_to(filter_row, content_left);
     set_fg(get_dim());
     platform_write_str("filter: ");
     set_fg(get_accent());
-    for (int i = 0; i < toc->filter_len && i < content_width - 10; i++) {
+    for (int32_t i = 0; i < toc->filter_len && i < content_width - 10; i++) {
         platform_write_char(toc->filter[i]);
     }
     // Cursor indicator
@@ -569,28 +520,28 @@ void render_toc(void) {
     // Results count
     char count_str[32];
     snprintf(count_str, sizeof(count_str), "%d/%d", toc->filtered_count, toc->count);
-    move_to(filter_row, content_right - (int)strlen(count_str));
+    move_to(filter_row, content_right - (int32_t)strlen(count_str));
     set_fg(get_dim());
     platform_write_str(count_str);
 
     // Separator
     move_to(top + 5, content_left);
     set_fg(get_border());
-    for (int i = 0; i < content_width; i++) platform_write_str("─");
+    for (int32_t i = 0; i < content_width; i++) platform_write_str("─");
 
     // TOC entries
-    int list_start = top + 6;
-    int visible = list_height;
+    int32_t list_start = top + 6;
+    int32_t visible = list_height;
 
     // Adjust scroll to keep selection visible
     if (toc->selected < toc->scroll) toc->scroll = toc->selected;
     if (toc->selected >= toc->scroll + visible) toc->scroll = toc->selected - visible + 1;
 
-    for (int i = 0; i < visible; i++) {
-        int idx = toc->scroll + i;
+    for (int32_t i = 0; i < visible; i++) {
+        int32_t idx = toc->scroll + i;
         if (idx >= toc->filtered_count) break;
 
-        int entry_idx = toc->filtered[idx];
+        int32_t entry_idx = toc->filtered[idx];
         TocEntry *entry = &toc->entries[entry_idx];
 
         move_to(list_start + i, content_left);
@@ -604,19 +555,19 @@ void render_toc(void) {
         }
 
         // Indentation based on hierarchy depth
-        int indent = entry->depth * 2;
-        for (int j = 0; j < indent && j < 12; j++) platform_write_char(' ');
+        int32_t indent = entry->depth * 2;
+        for (int32_t j = 0; j < indent && j < 12; j++) platform_write_char(' ');
 
         // Header text
         set_fg(idx == toc->selected ? get_fg() : get_dim());
         if (idx == toc->selected) platform_set_bold(true);
 
         // Truncate if needed
-        int max_text = content_width - 4 - indent;
-        int text_len = entry->text_len;
+        int32_t max_text = content_width - 4 - indent;
+        int32_t text_len = entry->text_len;
         if (text_len > max_text) text_len = max_text;
 
-        for (int j = 0; j < text_len; j++) {
+        for (int32_t j = 0; j < text_len; j++) {
             platform_write_char(entry->text[j]);
         }
         if (entry->text_len > max_text) {
@@ -655,18 +606,18 @@ void render_search(void) {
     if (!search) return;
 
     // Calculate dimensions
-    int width = app.cols > 90 ? 80 : app.cols - 6;
-    int max_height = app.rows - 6;
-    int list_height = max_height - 8;
+    int32_t width = app.cols > 90 ? 80 : app.cols - 6;
+    int32_t max_height = app.rows - 6;
+    int32_t list_height = max_height - 8;
     if (list_height < 3) list_height = 3;
-    int height = list_height + 8;
+    int32_t height = list_height + 8;
 
-    int top, left;
+    int32_t top, left;
     render_popup_box(width, height, &top, &left);
 
-    int content_left = left + 3;
-    int content_right = left + width - 3;
-    int content_width = content_right - content_left;
+    int32_t content_left = left + 3;
+    int32_t content_right = left + width - 3;
+    int32_t content_width = content_right - content_left;
 
     set_bg(get_modal_bg());
 
@@ -679,12 +630,12 @@ void render_search(void) {
     set_bg(get_modal_bg());
 
     // Search input
-    int search_row = top + 4;
+    int32_t search_row = top + 4;
     move_to(search_row, content_left);
     set_fg(get_dim());
     platform_write_str("find: ");
     set_fg(get_accent());
-    for (int i = 0; i < search->query_len && i < content_width - 8; i++) {
+    for (int32_t i = 0; i < search->query_len && i < content_width - 8; i++) {
         platform_write_char(search->query[i]);
     }
     set_fg(get_fg());
@@ -697,25 +648,25 @@ void render_search(void) {
     } else {
         snprintf(count_str, sizeof(count_str), "%d match%s", search->count, search->count == 1 ? "" : "es");
     }
-    move_to(search_row, content_right - (int)strlen(count_str));
+    move_to(search_row, content_right - (int32_t)strlen(count_str));
     set_fg(get_dim());
     platform_write_str(count_str);
 
     // Separator
     move_to(top + 5, content_left);
     set_fg(get_border());
-    for (int i = 0; i < content_width; i++) platform_write_str("─");
+    for (int32_t i = 0; i < content_width; i++) platform_write_str("─");
 
     // Search results with context
-    int list_start = top + 6;
-    int visible = list_height;
+    int32_t list_start = top + 6;
+    int32_t visible = list_height;
 
     // Adjust scroll
     if (search->selected < search->scroll) search->scroll = search->selected;
     if (search->selected >= search->scroll + visible) search->scroll = search->selected - visible + 1;
 
-    for (int i = 0; i < visible; i++) {
-        int idx = search->scroll + i;
+    for (int32_t i = 0; i < visible; i++) {
+        int32_t idx = search->scroll + i;
         if (idx >= search->count) break;
 
         SearchResult *r = &search->results[idx];
@@ -737,9 +688,9 @@ void render_search(void) {
         platform_write_str(line_str);
 
         // Context with highlighted match
-        int max_ctx = content_width - 10;
+        int32_t max_ctx = content_width - 10;
 
-        for (int j = 0; j < r->context_len && j < max_ctx; j++) {
+        for (int32_t j = 0; j < r->context_len && j < max_ctx; j++) {
             // Highlight the match
             if (j >= r->match_start && j < r->match_start + r->match_len) {
                 set_fg(get_accent());

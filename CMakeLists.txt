@@ -6,9 +6,21 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(USE_LIBAI "Build with Apple Intelligence (macOS 26+)" OFF)
+option(ENABLE_ASAN "Enable AddressSanitizer" OFF)
+option(ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer" OFF)
 set(DAWN_VERSION "dev" CACHE STRING "Version string")
 
+# Sanitizer flags
+set(SANITIZER_FLAGS "")
+if(ENABLE_ASAN)
+    list(APPEND SANITIZER_FLAGS -fsanitize=address -fno-omit-frame-pointer)
+endif()
+if(ENABLE_UBSAN)
+    list(APPEND SANITIZER_FLAGS -fsanitize=undefined)
+endif()
+
 file(GLOB DAWN_SRCS src/dawn*.c)
+list(FILTER DAWN_SRCS EXCLUDE REGEX "dawn_backend_.*\\.c$")
 file(GLOB HIGHLIGHT_SRCS src/highlight/*.c src/highlight/lang/*.c)
 
 set(PCRE2_BUILD_PCRE2GREP OFF CACHE BOOL "" FORCE)
@@ -29,7 +41,7 @@ if(NOT EMSCRIPTEN)
     add_executable(dawn
         ${DAWN_SRCS}
         ${HIGHLIGHT_SRCS}
-        src/platform_posix.c
+        src/dawn_backend_posix.c
         src/main_term.c
         third-party/cJSON.c
     )
@@ -42,10 +54,15 @@ if(NOT EMSCRIPTEN)
     )
 
     target_compile_options(dawn PRIVATE
-        -Wall -Wextra -Wpedantic -Werror -Wno-unused-function
-        $<$<C_COMPILER_ID:AppleClang,Clang>:-Wno-keyword-macro -Wno-newline-eof>
+        -Wall -Wextra -Wpedantic -Werror -Wunused
+        $<$<C_COMPILER_ID:AppleClang,Clang>:-Wno-keyword-macro -Wno-newline-eof -Wno-deprecated-declarations>
+        ${SANITIZER_FLAGS}
     )
     target_compile_definitions(dawn PRIVATE VERSION="${DAWN_VERSION}")
+
+    if(SANITIZER_FLAGS)
+        target_link_options(dawn PRIVATE ${SANITIZER_FLAGS})
+    endif()
 
     target_link_libraries(dawn PRIVATE pcre2-8-static utf8proc CURL::libcurl)
 
@@ -74,14 +91,44 @@ if(NOT EMSCRIPTEN)
     endif()
 
     install(TARGETS dawn RUNTIME DESTINATION bin)
+
+    # Test target for dawn_block
+    add_executable(test-block
+        tests/test_block.c
+        src/dawn_block.c
+        src/dawn_gap.c
+        src/dawn_md.c
+        src/dawn_wrap.c
+        third-party/cJSON.c
+    )
+
+    target_include_directories(test-block PRIVATE
+        src
+        third-party
+        ${CMAKE_BINARY_DIR}/third-party/pcre2
+        third-party/pcre2/src
+    )
+
+    target_compile_options(test-block PRIVATE
+        -Wall -Wextra -Wpedantic -Werror -Wunused
+        $<$<C_COMPILER_ID:AppleClang,Clang>:-Wno-keyword-macro -Wno-newline-eof -Wno-deprecated-declarations>
+        ${SANITIZER_FLAGS}
+    )
+
+    if(SANITIZER_FLAGS)
+        target_link_options(test-block PRIVATE ${SANITIZER_FLAGS})
+    endif()
+
+    target_link_libraries(test-block PRIVATE pcre2-8-static utf8proc)
 else()
     file(GLOB WEB_SRCS src/dawn*.c)
     list(FILTER WEB_SRCS EXCLUDE REGEX "dawn_args.c")
+    list(FILTER WEB_SRCS EXCLUDE REGEX "dawn_backend_posix.c")
 
     add_executable(dawn-web
         ${WEB_SRCS}
         ${HIGHLIGHT_SRCS}
-        src/platform_web.c
+        src/dawn_backend_web.c
         src/main_web.c
         third-party/cJSON.c
     )

@@ -35,8 +35,8 @@ void wrap_free(WrapResult *wr) {
 }
 
 //! Add a line to wrap result, expanding if needed
-static void wrap_add_line(WrapResult *wr, size_t start, size_t end, int width,
-                          int segment, bool hard_break, bool ends_split) {
+static void wrap_add_line(WrapResult *wr, size_t start, size_t end, int32_t width,
+                          int32_t segment, bool hard_break, bool ends_split) {
     if (wr->count >= wr->capacity) {
         wr->capacity *= 2;
         wr->lines = realloc(wr->lines, sizeof(WrapLine) * wr->capacity);
@@ -55,11 +55,11 @@ static void wrap_add_line(WrapResult *wr, size_t start, size_t end, int width,
 // #region Codepoint Utilities
 
 //! Get display width of a single Unicode codepoint
-static int codepoint_width(utf8proc_int32_t cp) {
+static int32_t codepoint_width(utf8proc_int32_t cp) {
     if (cp < 0) return 0;
     if (cp < 32) return 0;  // Control chars
 
-    int w = utf8proc_charwidth(cp);
+    int32_t w = utf8proc_charwidth(cp);
     // utf8proc returns -1 for control chars, 0 for non-printing, 1 or 2 for others
     if (w < 0) return 0;
     return w;
@@ -154,7 +154,7 @@ static size_t next_grapheme(const char *text, size_t len, size_t pos) {
 }
 
 //! Get display width of grapheme at position, advancing position
-static int grapheme_width_and_advance(const char *text, size_t len, size_t *pos) {
+static int32_t grapheme_width_and_advance(const char *text, size_t len, size_t *pos) {
     if (*pos >= len) return 0;
 
     size_t start = *pos;
@@ -163,7 +163,7 @@ static int grapheme_width_and_advance(const char *text, size_t len, size_t *pos)
 
     // Calculate width of all codepoints in grapheme cluster
     // For most cases, only the base character contributes width
-    int width = 0;
+    int32_t width = 0;
     size_t p = start;
     bool first = true;
 
@@ -197,8 +197,8 @@ static utf8proc_int32_t codepoint_at(const char *text, size_t len, size_t pos) {
 
 // #region Display Width
 
-int utf8_display_width(const char *text, size_t len) {
-    int width = 0;
+int32_t utf8_display_width(const char *text, size_t len) {
+    int32_t width = 0;
     size_t pos = 0;
 
     while (pos < len) {
@@ -216,24 +216,24 @@ int utf8_display_width(const char *text, size_t len) {
 typedef struct {
     size_t start;           //!< Byte offset where word started
     size_t end;             //!< Byte offset where word ends (exclusive)
-    int width;              //!< Display width of word
+    int32_t width;              //!< Display width of word
     bool has_nbsp;          //!< Word contains non-breaking space (don't split)
 } WordBuffer;
 
 //! State for the current line being built
 typedef struct {
     size_t start;           //!< Byte offset where line started
-    int width;              //!< Current display width
+    int32_t width;              //!< Current display width
     size_t last_break_pos;  //!< Position of last break opportunity
-    int width_at_break;     //!< Width at last break opportunity
-    int segment;            //!< Segment number within original line
+    int32_t width_at_break;     //!< Width at last break opportunity
+    int32_t segment;            //!< Segment number within original line
 } LineState;
 
 // #endregion
 
 // #region String Wrapping (Enhanced)
 
-int wrap_string_config(const char *text, size_t len, int width, WrapConfig config, WrapResult *out) {
+int32_t wrap_string_config(const char *text, size_t len, int32_t width, WrapConfig config, WrapResult *out) {
     out->count = 0;
     out->config = config;
     out->limit = width;
@@ -307,7 +307,7 @@ int wrap_string_config(const char *text, size_t len, int width, WrapConfig confi
             }
 
             // Calculate tab expansion
-            int tab_width = config.tab_size - (line.width % config.tab_size);
+            int32_t tab_width = config.tab_size - (line.width % config.tab_size);
             if (tab_width == 0) tab_width = config.tab_size;
 
             // Check if tab fits
@@ -378,7 +378,7 @@ int wrap_string_config(const char *text, size_t len, int width, WrapConfig confi
         if (cp == '-' && config.keep_dash_with_word) {
             // Add dash to current word
             size_t next_pos = pos;
-            int gw = grapheme_width_and_advance(text, len, &next_pos);
+            int32_t gw = grapheme_width_and_advance(text, len, &next_pos);
 
             if (word.width == 0) {
                 word.start = pos;
@@ -400,7 +400,7 @@ int wrap_string_config(const char *text, size_t len, int width, WrapConfig confi
 
         // Regular grapheme - add to word buffer
         size_t next_pos = pos;
-        int gw = grapheme_width_and_advance(text, len, &next_pos);
+        int32_t gw = grapheme_width_and_advance(text, len, &next_pos);
 
         if (word.width == 0) {
             word.start = pos;
@@ -426,19 +426,19 @@ int wrap_string_config(const char *text, size_t len, int width, WrapConfig confi
                 // Split the word with hyphen
                 // We need to find grapheme boundaries within the word
                 size_t word_pos = word.start;
-                int accum_width = 0;
+                int32_t accum_width = 0;
                 size_t last_grapheme_end = word_pos;
                 bool prev_wordy = false;
 
                 while (word_pos < word.end) {
                     size_t grapheme_start = word_pos;
                     size_t grapheme_end = next_grapheme(text, len, word_pos);
-                    int gwidth = utf8_display_width(text + grapheme_start, grapheme_end - grapheme_start);
+                    int32_t gwidth = utf8_display_width(text + grapheme_start, grapheme_end - grapheme_start);
                     bool curr_wordy = grapheme_is_wordy(text + grapheme_start, grapheme_end - grapheme_start);
 
                     // Would this grapheme + hyphen exceed limit?
                     // Reserve 1 char for hyphen if both sides are wordy
-                    int hyphen_width = (prev_wordy && curr_wordy) ? 1 : 0;
+                    int32_t hyphen_width = (prev_wordy && curr_wordy) ? 1 : 0;
 
                     if (accum_width + gwidth + hyphen_width > width && accum_width > 0) {
                         // Output line up to last_grapheme_end
@@ -499,7 +499,7 @@ int wrap_string_config(const char *text, size_t len, int width, WrapConfig confi
     return out->count;
 }
 
-int wrap_string(const char *text, size_t len, int width, WrapResult *out) {
+int32_t wrap_string(const char *text, size_t len, int32_t width, WrapResult *out) {
     return wrap_string_config(text, len, width, wrap_config_default(), out);
 }
 
@@ -578,7 +578,7 @@ size_t gap_grapheme_prev(const GapBuffer *gb, size_t pos) {
     return prev;
 }
 
-int gap_grapheme_width(const GapBuffer *gb, size_t pos, size_t *next_pos) {
+int32_t gap_grapheme_width(const GapBuffer *gb, size_t pos, size_t *next_pos) {
     size_t len = gap_len(gb);
     if (pos >= len) {
         if (next_pos) *next_pos = len;
@@ -595,8 +595,8 @@ int gap_grapheme_width(const GapBuffer *gb, size_t pos, size_t *next_pos) {
     return codepoint_width(cp);
 }
 
-int gap_display_width(const GapBuffer *gb, size_t start, size_t end) {
-    int width = 0;
+int32_t gap_display_width(const GapBuffer *gb, size_t start, size_t end) {
+    int32_t width = 0;
     size_t pos = start;
 
     while (pos < end) {
@@ -608,7 +608,7 @@ int gap_display_width(const GapBuffer *gb, size_t start, size_t end) {
     return width;
 }
 
-size_t gap_find_wrap_point(const GapBuffer *gb, size_t start, size_t end, int width, int *out_width) {
+size_t gap_find_wrap_point(const GapBuffer *gb, size_t start, size_t end, int32_t width, int32_t *out_width) {
     size_t len = gap_len(gb);
     if (start >= len || start >= end) {
         if (out_width) *out_width = 0;
@@ -616,9 +616,9 @@ size_t gap_find_wrap_point(const GapBuffer *gb, size_t start, size_t end, int wi
     }
 
     size_t pos = start;
-    int cw = 0;
+    int32_t cw = 0;
     size_t last_break = start;
-    int width_at_break = 0;
+    int32_t width_at_break = 0;
 
     while (pos < end && pos < len) {
         size_t char_len;
@@ -626,7 +626,7 @@ size_t gap_find_wrap_point(const GapBuffer *gb, size_t start, size_t end, int wi
         if (cp < 0 || cp == '\n') break;
 
         size_t next_pos;
-        int gw = gap_grapheme_width(gb, pos, &next_pos);
+        int32_t gw = gap_grapheme_width(gb, pos, &next_pos);
 
         if (cw + gw > width && cw > 0) {
             if (last_break > start && width_at_break > 0) {
@@ -658,7 +658,7 @@ size_t gap_find_wrap_point(const GapBuffer *gb, size_t start, size_t end, int wi
 
 // #region Gap Buffer Wrapping (Enhanced)
 
-int wrap_text_config(const GapBuffer *gb, int width, WrapConfig config, WrapResult *out) {
+int32_t wrap_text_config(const GapBuffer *gb, int32_t width, WrapConfig config, WrapResult *out) {
     out->count = 0;
     out->config = config;
     out->limit = width;
@@ -732,7 +732,7 @@ int wrap_text_config(const GapBuffer *gb, int width, WrapConfig config, WrapResu
                 word = (WordBuffer){0};
             }
 
-            int tab_width = config.tab_size - (line.width % config.tab_size);
+            int32_t tab_width = config.tab_size - (line.width % config.tab_size);
             if (tab_width == 0) tab_width = config.tab_size;
 
             if (line.width + tab_width > width && line.width > 0) {
@@ -795,7 +795,7 @@ int wrap_text_config(const GapBuffer *gb, int width, WrapConfig config, WrapResu
         // Handle dash
         if (cp == '-' && config.keep_dash_with_word) {
             size_t next_pos;
-            int gw = gap_grapheme_width(gb, pos, &next_pos);
+            int32_t gw = gap_grapheme_width(gb, pos, &next_pos);
 
             if (word.width == 0) {
                 word.start = pos;
@@ -815,7 +815,7 @@ int wrap_text_config(const GapBuffer *gb, int width, WrapConfig config, WrapResu
 
         // Regular grapheme
         size_t next_pos;
-        int gw = gap_grapheme_width(gb, pos, &next_pos);
+        int32_t gw = gap_grapheme_width(gb, pos, &next_pos);
 
         if (word.width == 0) {
             word.start = pos;
@@ -836,13 +836,13 @@ int wrap_text_config(const GapBuffer *gb, int width, WrapConfig config, WrapResu
             // Word splitting for long words
             if (word.width > width && config.split_words && !word.has_nbsp) {
                 size_t word_pos = word.start;
-                int accum_width = 0;
+                int32_t accum_width = 0;
                 size_t last_grapheme_end = word_pos;
                 bool prev_wordy = false;
 
                 while (word_pos < word.end) {
                     size_t grapheme_end;
-                    int gwidth = gap_grapheme_width(gb, word_pos, &grapheme_end);
+                    int32_t gwidth = gap_grapheme_width(gb, word_pos, &grapheme_end);
 
                     // Check if current grapheme is wordy
                     size_t dummy;
@@ -851,7 +851,7 @@ int wrap_text_config(const GapBuffer *gb, int width, WrapConfig config, WrapResu
                     bool curr_wordy = (cat >= UTF8PROC_CATEGORY_LU && cat <= UTF8PROC_CATEGORY_LO) ||
                                      (cat >= UTF8PROC_CATEGORY_ND && cat <= UTF8PROC_CATEGORY_NO);
 
-                    int hyphen_width = (prev_wordy && curr_wordy) ? 1 : 0;
+                    int32_t hyphen_width = (prev_wordy && curr_wordy) ? 1 : 0;
 
                     if (accum_width + gwidth + hyphen_width > width && accum_width > 0) {
                         bool needs_hyphen = prev_wordy && curr_wordy;
@@ -908,7 +908,7 @@ int wrap_text_config(const GapBuffer *gb, int width, WrapConfig config, WrapResu
     return out->count;
 }
 
-int wrap_text(const GapBuffer *gb, int width, WrapResult *out) {
+int32_t wrap_text(const GapBuffer *gb, int32_t width, WrapResult *out) {
     return wrap_text_config(gb, width, wrap_config_default(), out);
 }
 

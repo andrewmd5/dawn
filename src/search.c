@@ -140,7 +140,7 @@ char *search_web(const char *query) {
             cJSON *related = cJSON_GetObjectItem(json, "RelatedTopics");
             if (related && cJSON_IsArray(related) && cJSON_GetArraySize(related) > 0) {
                 rpos += snprintf(result + rpos, 8192 - rpos, "**Related information:**\n");
-                int count = 0;
+                int32_t count = 0;
                 cJSON *topic;
                 cJSON_ArrayForEach(topic, related) {
                     if (count >= 5) break;
@@ -174,7 +174,7 @@ char *search_web(const char *query) {
             // Extract search result snippets from HTML
             const char *snippet_marker = "class=\"result__snippet\"";
             char *ptr = buf.data;
-            int count = 0;
+            int32_t count = 0;
 
             rpos += snprintf(result + rpos, 8192 - rpos, "**Search results for \"%s\":**\n\n", query);
 

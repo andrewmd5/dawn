@@ -14,7 +14,7 @@ extern const char *tex_to_subscript(const char *c);
 extern const char *tex_lookup_symbol(const char *name);
 extern const char *tex_get_accent(const char *name);
 extern TexFontStyle tex_get_font_style(const char *name);
-extern const char *tex_get_multiline_op(const char *name, int *out_height, int *out_width, int *out_horizon);
+extern const char *tex_get_multiline_op(const char *name, int32_t *out_height, int32_t *out_width, int32_t *out_horizon);
 extern const char *tex_get_delimiter_char(char delim, TexDelimPos position);
 extern char tex_revert_font_char(const char *utf8_char);
 extern const char *tex_unshrink_char(const char *utf8_char);
@@ -33,10 +33,10 @@ static void id_array_init(TexIdArray *arr) {
     arr->capacity = 0;
 }
 
-static void id_array_push(TexIdArray *arr, int val) {
+static void id_array_push(TexIdArray *arr, int32_t val) {
     if (arr->count >= arr->capacity) {
-        int new_cap = arr->capacity == 0 ? 8 : arr->capacity * 2;
-        arr->data = realloc(arr->data, new_cap * sizeof(int));
+        int32_t new_cap = arr->capacity == 0 ? 8 : arr->capacity * 2;
+        arr->data = realloc(arr->data, new_cap * sizeof(int32_t));
         arr->capacity = new_cap;
     }
     arr->data[arr->count++] = val;
@@ -70,7 +70,7 @@ static void row_init(TexRow *row) {
 
 static void row_push(TexRow *row, const char *ch) {
     if (row->count >= row->capacity) {
-        int new_cap = row->capacity == 0 ? TEX_INITIAL_ROW_CAPACITY : row->capacity * 2;
+        int32_t new_cap = row->capacity == 0 ? TEX_INITIAL_ROW_CAPACITY : row->capacity * 2;
         row->cells = realloc(row->cells, new_cap * sizeof(TexCell));
         row->capacity = new_cap;
     }
@@ -79,7 +79,7 @@ static void row_push(TexRow *row, const char *ch) {
 }
 
 static void row_free(TexRow *row) {
-    for (int i = 0; i < row->count; i++) {
+    for (int32_t i = 0; i < row->count; i++) {
         free(row->cells[i].data);
     }
     free(row->cells);
@@ -88,7 +88,7 @@ static void row_free(TexRow *row) {
     row->capacity = 0;
 }
 
-TexSketch *tex_sketch_new(int height, int width) {
+TexSketch *tex_sketch_new(int32_t height, int32_t width) {
     TexSketch *s = calloc(1, sizeof(TexSketch));
     if (!s) return NULL;
 
@@ -97,9 +97,9 @@ TexSketch *tex_sketch_new(int height, int width) {
     s->horizon = 0;
     s->rows = calloc(height, sizeof(TexRow));
 
-    for (int i = 0; i < height; i++) {
+    for (int32_t i = 0; i < height; i++) {
         row_init(&s->rows[i]);
-        for (int j = 0; j < width; j++) {
+        for (int32_t j = 0; j < width; j++) {
             row_push(&s->rows[i], TEX_BG);
         }
     }
@@ -110,7 +110,7 @@ TexSketch *tex_sketch_new(int height, int width) {
 void tex_sketch_free(TexSketch *s) {
     if (!s) return;
     if (s->rows) {
-        for (int i = 0; i < s->height; i++) {
+        for (int32_t i = 0; i < s->height; i++) {
             row_free(&s->rows[i]);
         }
         free(s->rows);
@@ -120,8 +120,8 @@ void tex_sketch_free(TexSketch *s) {
 
 void tex_sketch_print(const TexSketch *s) {
     if (!s) return;
-    for (int i = 0; i < s->height; i++) {
-        for (int j = 0; j < s->rows[i].count; j++) {
+    for (int32_t i = 0; i < s->height; i++) {
+        for (int32_t j = 0; j < s->rows[i].count; j++) {
             printf("%s", s->rows[i].cells[j].data ? s->rows[i].cells[j].data : " ");
         }
         if (i == s->horizon) printf(" <--");
@@ -134,8 +134,8 @@ char *tex_sketch_to_string(const TexSketch *s) {
 
     // Calculate total size needed
     size_t total = 0;
-    for (int i = 0; i < s->height; i++) {
-        for (int j = 0; j < s->rows[i].count; j++) {
+    for (int32_t i = 0; i < s->height; i++) {
+        for (int32_t j = 0; j < s->rows[i].count; j++) {
             if (s->rows[i].cells[j].data) {
                 total += strlen(s->rows[i].cells[j].data);
             }
@@ -147,8 +147,8 @@ char *tex_sketch_to_string(const TexSketch *s) {
     if (!result) return NULL;
 
     char *pos = result;
-    for (int i = 0; i < s->height; i++) {
-        for (int j = 0; j < s->rows[i].count; j++) {
+    for (int32_t i = 0; i < s->height; i++) {
+        for (int32_t j = 0; j < s->rows[i].count; j++) {
             if (s->rows[i].cells[j].data) {
                 size_t len = strlen(s->rows[i].cells[j].data);
                 memcpy(pos, s->rows[i].cells[j].data, len);
@@ -163,7 +163,7 @@ char *tex_sketch_to_string(const TexSketch *s) {
 }
 
 //! Create a sketch from a list of rows
-static TexSketch *sketch_from_rows(TexRow *rows, int height, int horizon) {
+static TexSketch *sketch_from_rows(TexRow *rows, int32_t height, int32_t horizon) {
     TexSketch *s = calloc(1, sizeof(TexSketch));
     if (!s) return NULL;
 
@@ -171,8 +171,8 @@ static TexSketch *sketch_from_rows(TexRow *rows, int height, int horizon) {
     s->horizon = horizon;
     s->rows = rows;
 
-    int max_w = 0;
-    for (int i = 0; i < height; i++) {
+    int32_t max_w = 0;
+    for (int32_t i = 0; i < height; i++) {
         if (rows[i].count > max_w) max_w = rows[i].count;
     }
     s->width = max_w;
@@ -190,9 +190,9 @@ static TexSketch *sketch_clone(const TexSketch *src) {
     s->horizon = src->horizon;
     s->rows = malloc(src->height * sizeof(TexRow));
 
-    for (int i = 0; i < src->height; i++) {
+    for (int32_t i = 0; i < src->height; i++) {
         row_init(&s->rows[i]);
-        for (int j = 0; j < src->rows[i].count; j++) {
+        for (int32_t j = 0; j < src->rows[i].count; j++) {
             row_push(&s->rows[i], src->rows[i].cells[j].data);
         }
     }
@@ -232,19 +232,19 @@ static TexTokenType get_char_type(char c) {
     return TEX_TOK_SYMB;
 }
 
-TexToken *tex_lex(const char *input, size_t len, int *out_count) {
+TexToken *tex_lex(const char *input, size_t len, int32_t *out_count) {
     char *tex = malloc(len + 1);
     for (size_t i = 0; i < len; i++) {
         tex[i] = (input[i] == '\n' || input[i] == '\r' || input[i] == '\t') ? ' ' : input[i];
     }
     tex[len] = '\0';
 
-    int capacity = TEX_INITIAL_TOKEN_CAPACITY;
+    int32_t capacity = TEX_INITIAL_TOKEN_CAPACITY;
     TexToken *tokens = calloc(capacity, sizeof(TexToken));
-    int count = 0;
+    int32_t count = 0;
 
     char token_val[TEX_MAX_TOKEN_LEN];
-    int val_len = 0;
+    int32_t val_len = 0;
     TexTokenType token_type = TEX_TOK_NONE;
     TexToken prev_token = {0};
 
@@ -336,16 +336,16 @@ TexToken *tex_lex(const char *input, size_t len, int *out_count) {
     }
 
     // Add meta tokens
-    int meta_count = 2 + (need_line_wrapper ? 2 : 0);
-    int new_count = count + meta_count;
+    int32_t meta_count = 2 + (need_line_wrapper ? 2 : 0);
+    int32_t new_count = count + meta_count;
     tokens = realloc(tokens, new_count * sizeof(TexToken));
 
     // Shift existing tokens
-    int shift = 1 + (need_line_wrapper ? 1 : 0);
+    int32_t shift = 1 + (need_line_wrapper ? 1 : 0);
     memmove(tokens + shift, tokens, count * sizeof(TexToken));
 
     // Add start
-    int idx = 0;
+    int32_t idx = 0;
     tokens[idx].type = TEX_TOK_META;
     strcpy(tokens[idx].value, "start");
     tokens[idx].value_len = 5;
@@ -522,7 +522,7 @@ static const TexTypeInfoEntry TYPE_INFO[] = {
 
 //! Check if type is in array
 static inline bool type_in_array(TexNodeType t, const TexNodeType *arr) {
-    for (int i = 0; i < 8 && arr[i] != TEX_NT_NONE; i++) {
+    for (int32_t i = 0; i < 8 && arr[i] != TEX_NT_NONE; i++) {
         if (arr[i] == t) return true;
     }
     return false;
@@ -543,14 +543,14 @@ static inline bool is_script_type(TexNodeType t) {
 }
 
 //! Get script base node (for attaching scripts)
-static int get_script_base(TexNodeType node_type, TexNodeArray *nodes, int *parent_stack, int stack_count) {
+static int32_t get_script_base(TexNodeType node_type, TexNodeArray *nodes, int32_t *parent_stack, int32_t stack_count) {
     if (!is_script_type(node_type) || stack_count == 0) return -1;
 
-    int parent_id = parent_stack[stack_count - 1];
+    int32_t parent_id = parent_stack[stack_count - 1];
     TexIdArray *siblings = &nodes->nodes[parent_id].children;
     if (siblings->count == 0) return -1;
 
-    int base_id = siblings->data[siblings->count - 1];
+    int32_t base_id = siblings->data[siblings->count - 1];
     if (is_script_type(nodes->nodes[base_id].type)) {
         return (siblings->count >= 2) ? siblings->data[siblings->count - 2] : -1;
     }
@@ -565,21 +565,21 @@ static inline TexNodeType update_script_type(TexNodeType base_type, TexNodeType 
     return script_type;
 }
 
-TexNodeArray *tex_parse(TexToken *tokens, int count) {
+TexNodeArray *tex_parse(TexToken *tokens, int32_t count) {
     TexNodeArray *arr = calloc(1, sizeof(TexNodeArray));
     arr->nodes = calloc(TEX_INITIAL_NODE_CAPACITY, sizeof(TexNode));
     arr->capacity = TEX_INITIAL_NODE_CAPACITY;
     arr->count = 0;
 
-    int *parent_stack = calloc(TEX_INITIAL_STACK_CAPACITY, sizeof(int));
-    int stack_count = 0;
-    int stack_capacity = TEX_INITIAL_STACK_CAPACITY;
+    int32_t *parent_stack = calloc(TEX_INITIAL_STACK_CAPACITY, sizeof(int32_t));
+    int32_t stack_count = 0;
+    int32_t stack_capacity = TEX_INITIAL_STACK_CAPACITY;
 
-    for (int i = 0; i < count; i++) {
+    for (int32_t i = 0; i < count; i++) {
         TexToken *token = &tokens[i];
 
         TexNodeType parent_type = TEX_NT_NONE;
-        int parent_id = -1;
+        int32_t parent_id = -1;
         if (stack_count > 0) {
             parent_id = parent_stack[stack_count - 1];
             parent_type = arr->nodes[parent_id].type;
@@ -597,7 +597,7 @@ TexNodeArray *tex_parse(TexToken *tokens, int count) {
         bool can_update_parent = (info->flags & TI_BREAK);
         bool can_dbl_pop = (info->flags & TI_DBL_POP);
 
-        int base_id = get_script_base(node_type, arr, parent_stack, stack_count);
+        int32_t base_id = get_script_base(node_type, arr, parent_stack, stack_count);
 
         if (base_id != -1) {
             TexNodeType base_type = arr->nodes[base_id].type;
@@ -629,10 +629,10 @@ TexNodeArray *tex_parse(TexToken *tokens, int count) {
         }
 
         // Add to parent stack
-        for (int j = 0; j < info->add_amount; j++) {
+        for (int32_t j = 0; j < info->add_amount; j++) {
             if (stack_count >= stack_capacity) {
                 stack_capacity *= 2;
-                parent_stack = realloc(parent_stack, stack_capacity * sizeof(int));
+                parent_stack = realloc(parent_stack, stack_capacity * sizeof(int32_t));
             }
             parent_stack[stack_count++] = arr->count;
         }
@@ -658,7 +658,7 @@ TexNodeArray *tex_parse(TexToken *tokens, int count) {
 
 void tex_nodes_free(TexNodeArray *arr) {
     if (!arr) return;
-    for (int i = 0; i < arr->count; i++) {
+    for (int32_t i = 0; i < arr->count; i++) {
         id_array_free(&arr->nodes[i].children);
         id_array_free(&arr->nodes[i].scripts);
     }
@@ -671,14 +671,14 @@ void tex_nodes_free(TexNodeArray *arr) {
 // #region Renderer - Utility Functions
 
 //! Get nth UTF-8 character from string
-static const char *utf8_get_char(const char *s, int idx) {
+static const char *utf8_get_char(const char *s, int32_t idx) {
     static char buf[8];
     if (!s) return NULL;
 
     const uint8_t *p = (const uint8_t *)s;
-    int i = 0;
+    int32_t i = 0;
     while (*p && i < idx) {
-        int len = utf8proc_utf8class[*p];
+        int32_t len = utf8proc_utf8class[*p];
         if (len < 1) len = 1;
         p += len;
         i++;
@@ -686,7 +686,7 @@ static const char *utf8_get_char(const char *s, int idx) {
 
     if (!*p) return NULL;
 
-    int len = utf8proc_utf8class[*p];
+    int32_t len = utf8proc_utf8class[*p];
     if (len < 1) len = 1;
     memcpy(buf, p, len);
     buf[len] = '\0';
@@ -694,7 +694,7 @@ static const char *utf8_get_char(const char *s, int idx) {
 }
 
 //! Get character at index in alphabet string
-static const char *alphabet_char_at(const char *alphabet, int idx) {
+static const char *alphabet_char_at(const char *alphabet, int32_t idx) {
     return utf8_get_char(alphabet, idx);
 }
 
@@ -706,7 +706,7 @@ static const char *apply_font(const char *ch, TexFontStyle style) {
     if (!ISALPHA_(c)) return ch;
 
     const char *alphabet = tex_get_alphabet(style);
-    int idx = ISUPPER_(c) ? (c - 'A') : (c - 'a' + 26);
+    int32_t idx = ISUPPER_(c) ? (c - 'A') : (c - 'a' + 26);
 
     const char *result = alphabet_char_at(alphabet, idx);
     return result ? result : ch;
@@ -719,9 +719,9 @@ static TexSketch *util_font(const char *font_val, TexSketch *child) {
     TexFontStyle style = tex_get_font_style(font_val);
     TexSketch *result = sketch_clone(child);
 
-    for (int i = 0; i < result->height; i++) {
+    for (int32_t i = 0; i < result->height; i++) {
         TexRow *row = &result->rows[i];
-        for (int j = 0; j < row->count; j++) {
+        for (int32_t j = 0; j < row->count; j++) {
             char *old_ch = row->cells[j].data;
             if (!old_ch) continue;
 
@@ -741,43 +741,43 @@ static TexSketch *util_font(const char *font_val, TexSketch *child) {
 }
 
 //! Concatenate sketches horizontally with horizon alignment
-static TexSketch *util_concat(TexSketch **children, int child_count, bool concat_line, bool align_amp) {
+static TexSketch *util_concat(TexSketch **children, int32_t child_count, bool concat_line, bool align_amp) {
     if (child_count == 0) return sketch_empty();
 
     // Find max heights above and below horizon
-    int maxh_sky = 0;
-    int maxh_ocn = 0;
+    int32_t maxh_sky = 0;
+    int32_t maxh_ocn = 0;
     bool contain_amp = false;
 
-    for (int i = 0; i < child_count; i++) {
+    for (int32_t i = 0; i < child_count; i++) {
         if (!children[i]) continue;
-        int horizon = children[i]->horizon;
+        int32_t horizon = children[i]->horizon;
         if (horizon == -1) {
             contain_amp = true;
             if (!align_amp) continue;
             continue;
         }
-        int h_sky = horizon;
-        int h_ocn = children[i]->height - horizon - 1;
+        int32_t h_sky = horizon;
+        int32_t h_ocn = children[i]->height - horizon - 1;
         if (h_sky > maxh_sky) maxh_sky = h_sky;
         if (h_ocn > maxh_ocn) maxh_ocn = h_ocn;
     }
 
-    int new_height = maxh_sky + 1 + maxh_ocn;
-    int concated_horizon = maxh_sky;
+    int32_t new_height = maxh_sky + 1 + maxh_ocn;
+    int32_t concated_horizon = maxh_sky;
 
     // Create result rows
     TexRow *rows = calloc(new_height, sizeof(TexRow));
-    for (int i = 0; i < new_height; i++) {
+    for (int32_t i = 0; i < new_height; i++) {
         row_init(&rows[i]);
     }
 
     // Concatenate each child
-    for (int c = 0; c < child_count; c++) {
+    for (int32_t c = 0; c < child_count; c++) {
         TexSketch *child = children[c];
         if (!child) continue;
 
-        int horizon = child->horizon;
+        int32_t horizon = child->horizon;
         if (horizon == -1) {
             if (align_amp) {
                 concated_horizon = rows[0].count;
@@ -785,39 +785,39 @@ static TexSketch *util_concat(TexSketch **children, int child_count, bool concat
             continue;
         }
 
-        int h_sky = horizon;
-        int h_ocn = child->height - horizon - 1;
-        int top_pad_len = maxh_sky - h_sky;
-        int btm_pad_len = maxh_ocn - h_ocn;
+        int32_t h_sky = horizon;
+        int32_t h_ocn = child->height - horizon - 1;
+        int32_t top_pad_len = maxh_sky - h_sky;
+        int32_t btm_pad_len = maxh_ocn - h_ocn;
 
-        int child_width = child->width;
+        int32_t child_width = child->width;
         if (child->height > 0 && child->rows[0].count > child_width) {
             child_width = child->rows[0].count;
         }
 
         // Add top padding
-        for (int r = 0; r < top_pad_len; r++) {
-            for (int j = 0; j < child_width; j++) {
+        for (int32_t r = 0; r < top_pad_len; r++) {
+            for (int32_t j = 0; j < child_width; j++) {
                 row_push(&rows[r], TEX_BG);
             }
         }
 
         // Add child rows
-        for (int r = 0; r < child->height; r++) {
-            int dest_row = top_pad_len + r;
-            for (int j = 0; j < child->rows[r].count; j++) {
+        for (int32_t r = 0; r < child->height; r++) {
+            int32_t dest_row = top_pad_len + r;
+            for (int32_t j = 0; j < child->rows[r].count; j++) {
                 row_push(&rows[dest_row], child->rows[r].cells[j].data);
             }
             // Pad to child_width
-            for (int j = child->rows[r].count; j < child_width; j++) {
+            for (int32_t j = child->rows[r].count; j < child_width; j++) {
                 row_push(&rows[dest_row], TEX_BG);
             }
         }
 
         // Add bottom padding
-        for (int r = 0; r < btm_pad_len; r++) {
-            int dest_row = top_pad_len + child->height + r;
-            for (int j = 0; j < child_width; j++) {
+        for (int32_t r = 0; r < btm_pad_len; r++) {
+            int32_t dest_row = top_pad_len + child->height + r;
+            for (int32_t j = 0; j < child_width; j++) {
                 row_push(&rows[dest_row], TEX_BG);
             }
         }
@@ -831,34 +831,34 @@ static TexSketch *util_concat(TexSketch **children, int child_count, bool concat
 }
 
 //! Stack sketches vertically with alignment
-static TexSketch *util_vert_pile(TexSketch *top, TexSketch *ctr, int ctr_horizon, TexSketch *btm, TexAlign align) {
-    int top_height = (top && !sketch_is_empty(top)) ? top->height : 0;
-    int ctr_height = (ctr && !sketch_is_empty(ctr)) ? ctr->height : 0;
-    int btm_height = (btm && !sketch_is_empty(btm)) ? btm->height : 0;
+static TexSketch *util_vert_pile(TexSketch *top, TexSketch *ctr, int32_t ctr_horizon, TexSketch *btm, TexAlign align) {
+    int32_t top_height = (top && !sketch_is_empty(top)) ? top->height : 0;
+    int32_t ctr_height = (ctr && !sketch_is_empty(ctr)) ? ctr->height : 0;
+    int32_t btm_height = (btm && !sketch_is_empty(btm)) ? btm->height : 0;
 
-    int piled_horizon = top_height + ctr_horizon;
+    int32_t piled_horizon = top_height + ctr_horizon;
     if (top && sketch_is_empty(top)) piled_horizon--;
     if (ctr && sketch_is_empty(ctr)) piled_horizon--;
     if (piled_horizon < 0) piled_horizon = 0;
 
-    int max_len = 0;
+    int32_t max_len = 0;
     if (top && !sketch_is_empty(top) && top->rows[0].count > max_len) max_len = top->rows[0].count;
     if (ctr && !sketch_is_empty(ctr) && ctr->rows[0].count > max_len) max_len = ctr->rows[0].count;
     if (btm && !sketch_is_empty(btm) && btm->rows[0].count > max_len) max_len = btm->rows[0].count;
 
-    int total_height = top_height + ctr_height + btm_height;
+    int32_t total_height = top_height + ctr_height + btm_height;
     if (total_height == 0) return sketch_empty();
 
     TexRow *rows = calloc(total_height, sizeof(TexRow));
-    int row_idx = 0;
+    int32_t row_idx = 0;
 
     TexSketch *parts[] = {top, ctr, btm};
-    for (int p = 0; p < 3; p++) {
+    for (int32_t p = 0; p < 3; p++) {
         TexSketch *part = parts[p];
         if (!part || sketch_is_empty(part)) continue;
 
-        int part_len = part->rows[0].count;
-        int left_pad = 0;
+        int32_t part_len = part->rows[0].count;
+        int32_t left_pad = 0;
 
         if (align == TEX_ALIGN_CENTER) {
             left_pad = (max_len - part_len) / 2;
@@ -866,22 +866,22 @@ static TexSketch *util_vert_pile(TexSketch *top, TexSketch *ctr, int ctr_horizon
             left_pad = max_len - part_len;
         }
 
-        for (int r = 0; r < part->height; r++) {
+        for (int32_t r = 0; r < part->height; r++) {
             row_init(&rows[row_idx]);
 
             // Left padding
-            for (int j = 0; j < left_pad; j++) {
+            for (int32_t j = 0; j < left_pad; j++) {
                 row_push(&rows[row_idx], TEX_BG);
             }
 
             // Content
-            for (int j = 0; j < part->rows[r].count; j++) {
+            for (int32_t j = 0; j < part->rows[r].count; j++) {
                 row_push(&rows[row_idx], part->rows[r].cells[j].data);
             }
 
             // Right padding
-            int right_pad = max_len - left_pad - part->rows[r].count;
-            for (int j = 0; j < right_pad; j++) {
+            int32_t right_pad = max_len - left_pad - part->rows[r].count;
+            for (int32_t j = 0; j < right_pad; j++) {
                 row_push(&rows[row_idx], TEX_BG);
             }
 
@@ -896,14 +896,14 @@ static TexSketch *util_vert_pile(TexSketch *top, TexSketch *ctr, int ctr_horizon
 //! @param script_type_id 0 = superscript, 1 = subscript
 //! @param smart Allow keeping existing opposite script
 //! @param switch_script Convert opposite script to target script
-static TexSketch *util_shrink(TexSketch *sketch, int script_type_id, bool smart, bool switch_script) {
+static TexSketch *util_shrink(TexSketch *sketch, int32_t script_type_id, bool smart, bool switch_script) {
     if (!sketch || sketch->height != 1) return NULL;
 
     TexRow *row = &sketch->rows[0];
     TexRow new_row;
     row_init(&new_row);
 
-    for (int i = 0; i < row->count; i++) {
+    for (int32_t i = 0; i < row->count; i++) {
         const char *ch = row->cells[i].data;
         if (!ch) {
             row_free(&new_row);
@@ -966,7 +966,7 @@ static TexSketch *util_shrink(TexSketch *sketch, int script_type_id, bool smart,
 }
 
 //! Render script (super or sub)
-static TexSketch *util_script(TexSketch *child, int script_type_id) {
+static TexSketch *util_script(TexSketch *child, int32_t script_type_id) {
     if (!child) return sketch_empty();
 
     // Try to shrink
@@ -1001,7 +1001,7 @@ static TexSketch *util_script(TexSketch *child, int script_type_id) {
 }
 
 //! Get pile center based on base height
-static TexSketch *util_get_pile_center(int base_height, int base_horizon, int *out_horizon) {
+static TexSketch *util_get_pile_center(int32_t base_height, int32_t base_horizon, int32_t *out_horizon) {
     if (base_height == 2) {
         *out_horizon = (base_horizon == 0) ? 0 : 1;
         return sketch_empty();
@@ -1012,9 +1012,9 @@ static TexSketch *util_get_pile_center(int base_height, int base_horizon, int *o
     }
 
     // Create center with (base_height - 2) rows
-    int center_height = base_height - 2;
+    int32_t center_height = base_height - 2;
     TexRow *rows = calloc(center_height, sizeof(TexRow));
-    for (int i = 0; i < center_height; i++) {
+    for (int32_t i = 0; i < center_height; i++) {
         row_init(&rows[i]);
         row_push(&rows[i], TEX_BG);
     }
@@ -1024,7 +1024,7 @@ static TexSketch *util_get_pile_center(int base_height, int base_horizon, int *o
 }
 
 //! Build delimiter sketch
-static TexSketch *util_delimiter(const char *delim_type, int height, int horizon) {
+static TexSketch *util_delimiter(const char *delim_type, int32_t height, int32_t horizon) {
     if (!delim_type || strcmp(delim_type, ".") == 0) {
         return sketch_empty();
     }
@@ -1044,12 +1044,12 @@ static TexSketch *util_delimiter(const char *delim_type, int height, int horizon
         if (horizon == 0) horizon = 1;
     }
 
-    int center = horizon;
+    int32_t center = horizon;
     if (center == 0) center = 1;
     if (center == height - 1) center = height - 2;
 
     TexRow *rows = calloc(height, sizeof(TexRow));
-    for (int i = 0; i < height; i++) {
+    for (int32_t i = 0; i < height; i++) {
         row_init(&rows[i]);
         TexDelimPos pos = (i == 0) ? TEX_DELIM_TOP :
                           (i == height - 1) ? TEX_DELIM_BTM :
@@ -1065,7 +1065,7 @@ static TexSketch *util_delimiter(const char *delim_type, int height, int horizon
 
 // #region Renderer - Node Rendering
 
-static TexSketch *render_node(TexNodeArray *nodes, int node_id, bool use_serif, bool inline_mode);
+static TexSketch *render_node(TexNodeArray *nodes, int32_t node_id, bool use_serif, bool inline_mode);
 
 //! Render leaf node (symbol, number, letter)
 static TexSketch *render_leaf(TexToken *token, bool use_serif) {
@@ -1098,15 +1098,15 @@ static TexSketch *render_leaf(TexToken *token, bool use_serif) {
 
     if (token->type == TEX_TOK_CMND) {
         // Check for multi-line command
-        int op_height, op_width, op_horizon;
+        int32_t op_height, op_width, op_horizon;
         const char *ml = tex_get_multiline_op(token->value, &op_height, &op_width, &op_horizon);
         if (ml) {
             TexRow *rows = calloc(op_height, sizeof(TexRow));
             const char *p = ml;
-            for (int r = 0; r < op_height; r++) {
+            for (int32_t r = 0; r < op_height; r++) {
                 row_init(&rows[r]);
-                for (int c = 0; c < op_width; c++) {
-                    int len = utf8proc_utf8class[(uint8_t)*p];
+                for (int32_t c = 0; c < op_width; c++) {
+                    int32_t len = utf8proc_utf8class[(uint8_t)*p];
                     if (len < 1) len = 1;
                     char buf[8];
                     memcpy(buf, p, len);
@@ -1124,7 +1124,7 @@ static TexSketch *render_leaf(TexToken *token, bool use_serif) {
         const char *sym = tex_lookup_symbol(token->value);
         if (sym) {
             // Symbol may have multiple characters
-            int i = 0;
+            int32_t i = 0;
             while (sym[i]) {
                 const char *ch = utf8_get_char(sym, i);
                 if (ch) row_push(row, ch);
@@ -1148,15 +1148,15 @@ static TexSketch *render_leaf(TexToken *token, bool use_serif) {
 
 //! Render center base (sum, prod, lim)
 static TexSketch *render_ctr_base(TexToken *token) {
-    int height, width, horizon;
+    int32_t height, width, horizon;
     const char *ml = tex_get_multiline_op(token->value, &height, &width, &horizon);
     if (ml) {
         TexRow *rows = calloc(height, sizeof(TexRow));
         const char *p = ml;
-        for (int r = 0; r < height; r++) {
+        for (int32_t r = 0; r < height; r++) {
             row_init(&rows[r]);
-            for (int c = 0; c < width; c++) {
-                int len = utf8proc_utf8class[(uint8_t)*p];
+            for (int32_t c = 0; c < width; c++) {
+                int32_t len = utf8proc_utf8class[(uint8_t)*p];
                 if (len < 1) len = 1;
                 char buf[8];
                 memcpy(buf, p, len);
@@ -1175,7 +1175,7 @@ static TexSketch *render_ctr_base(TexToken *token) {
     if (sym) {
         const char *p = sym;
         while (*p) {
-            int len = utf8proc_utf8class[(uint8_t)*p];
+            int32_t len = utf8proc_utf8class[(uint8_t)*p];
             if (len < 1) len = 1;
             char buf[8];
             memcpy(buf, p, len);
@@ -1190,20 +1190,20 @@ static TexSketch *render_ctr_base(TexToken *token) {
 }
 
 //! Render children as concatenation
-static TexSketch *render_concat(TexNodeArray *nodes, int node_id, bool use_serif, bool inline_mode) {
+static TexSketch *render_concat(TexNodeArray *nodes, int32_t node_id, bool use_serif, bool inline_mode) {
     TexNode *node = &nodes->nodes[node_id];
-    int child_count = node->children.count;
+    int32_t child_count = node->children.count;
 
     if (child_count == 0) return sketch_empty();
 
     TexSketch **children = calloc(child_count, sizeof(TexSketch *));
-    for (int i = 0; i < child_count; i++) {
+    for (int32_t i = 0; i < child_count; i++) {
         children[i] = render_node(nodes, node->children.data[i], use_serif, inline_mode);
     }
 
     TexSketch *result = util_concat(children, child_count, false, false);
 
-    for (int i = 0; i < child_count; i++) {
+    for (int32_t i = 0; i < child_count; i++) {
         tex_sketch_free(children[i]);
     }
     free(children);
@@ -1219,8 +1219,8 @@ static TexSketch *render_apply_scripts(TexSketch *base, TexNodeArray *nodes, Tex
     TexSketch *btm = NULL;
     TexAlign base_position = TEX_ALIGN_LEFT;
 
-    for (int i = 0; i < script_ids->count; i++) {
-        int script_id = script_ids->data[i];
+    for (int32_t i = 0; i < script_ids->count; i++) {
+        int32_t script_id = script_ids->data[i];
         TexNode *script_node = &nodes->nodes[script_id];
         TexSketch *script_sketch = render_node(nodes, script_id, use_serif, inline_mode);
 
@@ -1246,7 +1246,7 @@ static TexSketch *render_apply_scripts(TexSketch *base, TexNodeArray *nodes, Tex
 
         // Copy base characters (only first row for inline)
         if (base && base->height > 0) {
-            for (int c = 0; c < base->rows[0].count; c++) {
+            for (int32_t c = 0; c < base->rows[0].count; c++) {
                 if (base->rows[0].cells[c].data) {
                     row_push(row, base->rows[0].cells[c].data);
                 }
@@ -1257,7 +1257,7 @@ static TexSketch *render_apply_scripts(TexSketch *base, TexNodeArray *nodes, Tex
         if (top && top->height > 0) {
             TexSketch *sup = util_shrink(top, 0, false, false);
             if (sup) {
-                for (int c = 0; c < sup->rows[0].count; c++) {
+                for (int32_t c = 0; c < sup->rows[0].count; c++) {
                     if (sup->rows[0].cells[c].data) {
                         row_push(row, sup->rows[0].cells[c].data);
                     }
@@ -1267,7 +1267,7 @@ static TexSketch *render_apply_scripts(TexSketch *base, TexNodeArray *nodes, Tex
                 // Fallback: render as ^(content)
                 row_push(row, "^");
                 row_push(row, "(");
-                for (int c = 0; c < top->rows[0].count; c++) {
+                for (int32_t c = 0; c < top->rows[0].count; c++) {
                     if (top->rows[0].cells[c].data) {
                         row_push(row, top->rows[0].cells[c].data);
                     }
@@ -1280,7 +1280,7 @@ static TexSketch *render_apply_scripts(TexSketch *base, TexNodeArray *nodes, Tex
         if (btm && btm->height > 0) {
             TexSketch *sub = util_shrink(btm, 1, false, false);
             if (sub) {
-                for (int c = 0; c < sub->rows[0].count; c++) {
+                for (int32_t c = 0; c < sub->rows[0].count; c++) {
                     if (sub->rows[0].cells[c].data) {
                         row_push(row, sub->rows[0].cells[c].data);
                     }
@@ -1290,7 +1290,7 @@ static TexSketch *render_apply_scripts(TexSketch *base, TexNodeArray *nodes, Tex
                 // Fallback: render as _(content)
                 row_push(row, "_");
                 row_push(row, "(");
-                for (int c = 0; c < btm->rows[0].count; c++) {
+                for (int32_t c = 0; c < btm->rows[0].count; c++) {
                     if (btm->rows[0].cells[c].data) {
                         row_push(row, btm->rows[0].cells[c].data);
                     }
@@ -1312,7 +1312,7 @@ static TexSketch *render_apply_scripts(TexSketch *base, TexNodeArray *nodes, Tex
     }
 
     // Side scripts
-    int ctr_horizon;
+    int32_t ctr_horizon;
     TexSketch *ctr = util_get_pile_center(base->height, base->horizon, &ctr_horizon);
 
     if (ctr && !sketch_is_empty(ctr)) {
@@ -1336,11 +1336,11 @@ static TexSketch *render_apply_scripts(TexSketch *base, TexNodeArray *nodes, Tex
     }
     if (top && !btm) {
         // Adjust horizon for top script
-        int top_height = top->height;
+        int32_t top_height = top->height;
         TexRow *top_rows = malloc(top_height * sizeof(TexRow));
-        for (int i = 0; i < top_height; i++) {
+        for (int32_t i = 0; i < top_height; i++) {
             row_init(&top_rows[i]);
-            for (int j = 0; j < top->rows[i].count; j++) {
+            for (int32_t j = 0; j < top->rows[i].count; j++) {
                 row_push(&top_rows[i], top->rows[i].cells[j].data);
             }
         }
@@ -1354,17 +1354,17 @@ static TexSketch *render_apply_scripts(TexSketch *base, TexNodeArray *nodes, Tex
 
     // Handle multi-row scripts
     TexSketch *ctr_new = NULL;
-    int ctr_horizon_new = 0;
+    int32_t ctr_horizon_new = 0;
     TexSketch *top_adj = top;
     TexSketch *btm_adj = btm;
 
     if (top && top->height > 1) {
         // Remove last row of top
-        int new_height = top->height - 1;
+        int32_t new_height = top->height - 1;
         TexRow *new_rows = calloc(new_height, sizeof(TexRow));
-        for (int i = 0; i < new_height; i++) {
+        for (int32_t i = 0; i < new_height; i++) {
             row_init(&new_rows[i]);
-            for (int j = 0; j < top->rows[i].count; j++) {
+            for (int32_t j = 0; j < top->rows[i].count; j++) {
                 row_push(&new_rows[i], top->rows[i].cells[j].data);
             }
         }
@@ -1373,11 +1373,11 @@ static TexSketch *render_apply_scripts(TexSketch *base, TexNodeArray *nodes, Tex
         ctr_horizon_new = 1;
     } else if (btm && btm->height > 1) {
         // Remove first row of btm
-        int new_height = btm->height - 1;
+        int32_t new_height = btm->height - 1;
         TexRow *new_rows = calloc(new_height, sizeof(TexRow));
-        for (int i = 0; i < new_height; i++) {
+        for (int32_t i = 0; i < new_height; i++) {
             row_init(&new_rows[i]);
-            for (int j = 0; j < btm->rows[i + 1].count; j++) {
+            for (int32_t j = 0; j < btm->rows[i + 1].count; j++) {
                 row_push(&new_rows[i], btm->rows[i + 1].cells[j].data);
             }
         }
@@ -1420,7 +1420,7 @@ static TexSketch *render_apply_scripts(TexSketch *base, TexNodeArray *nodes, Tex
 }
 
 //! Render fraction
-static TexSketch *render_fraction(TexNodeArray *nodes, int node_id, bool use_serif, bool inline_mode) {
+static TexSketch *render_fraction(TexNodeArray *nodes, int32_t node_id, bool use_serif, bool inline_mode) {
     TexNode *node = &nodes->nodes[node_id];
     if (node->children.count < 2) return sketch_empty();
 
@@ -1432,14 +1432,14 @@ static TexSketch *render_fraction(TexNodeArray *nodes, int node_id, bool use_ser
         TexRow *row = malloc(sizeof(TexRow));
         row_init(row);
         // Copy numerator cells
-        for (int i = 0; i < numer->rows[0].count; i++) {
+        for (int32_t i = 0; i < numer->rows[0].count; i++) {
             if (numer->rows[0].cells[i].data) {
                 row_push(row, numer->rows[0].cells[i].data);
             }
         }
         row_push(row, "⁄");  // Fraction slash U+2044
         // Copy denominator cells
-        for (int i = 0; i < denom->rows[0].count; i++) {
+        for (int32_t i = 0; i < denom->rows[0].count; i++) {
             if (denom->rows[0].cells[i].data) {
                 row_push(row, denom->rows[0].cells[i].data);
             }
@@ -1449,14 +1449,14 @@ static TexSketch *render_fraction(TexNodeArray *nodes, int node_id, bool use_ser
         return sketch_from_rows(row, 1, 0);
     }
 
-    int max_width = numer->rows[0].count;
+    int32_t max_width = numer->rows[0].count;
     if (denom->rows[0].count > max_width) max_width = denom->rows[0].count;
 
     // Build fraction line
     TexRow *frac_row = malloc(sizeof(TexRow));
     row_init(frac_row);
     row_push(frac_row, "╶");
-    for (int i = 0; i < max_width; i++) {
+    for (int32_t i = 0; i < max_width; i++) {
         row_push(frac_row, "─");
     }
     row_push(frac_row, "╴");
@@ -1472,12 +1472,12 @@ static TexSketch *render_fraction(TexNodeArray *nodes, int node_id, bool use_ser
 }
 
 //! Render square root
-static TexSketch *render_sqrt(TexNodeArray *nodes, int node_id, bool use_serif, bool inline_mode) {
+static TexSketch *render_sqrt(TexNodeArray *nodes, int32_t node_id, bool use_serif, bool inline_mode) {
     TexNode *node = &nodes->nodes[node_id];
     if (node->children.count == 0) return sketch_empty();
 
     // Find radicand (last child) and optional degree (first child if > 1)
-    int rad_idx = node->children.count - 1;
+    int32_t rad_idx = node->children.count - 1;
     TexSketch *radicand = render_node(nodes, node->children.data[rad_idx], use_serif, inline_mode);
     TexSketch *degree = NULL;
     if (node->children.count > 1) {
@@ -1492,7 +1492,7 @@ static TexSketch *render_sqrt(TexNodeArray *nodes, int node_id, bool use_serif, 
 
         // Add all radicand characters with combining overline
         if (radicand->height == 1) {
-            for (int i = 0; i < radicand->rows[0].count; i++) {
+            for (int32_t i = 0; i < radicand->rows[0].count; i++) {
                 char buf[16];
                 const char *rad_ch = radicand->rows[0].cells[i].data;
                 snprintf(buf, sizeof(buf), "%s\u0305", rad_ch ? rad_ch : "");
@@ -1501,8 +1501,8 @@ static TexSketch *render_sqrt(TexNodeArray *nodes, int node_id, bool use_serif, 
         } else {
             // Multi-row radicand in inline mode: just use √(content)
             row_push(row, "(");
-            for (int r = 0; r < radicand->height; r++) {
-                for (int c = 0; c < radicand->rows[r].count; c++) {
+            for (int32_t r = 0; r < radicand->height; r++) {
+                for (int32_t c = 0; c < radicand->rows[r].count; c++) {
                     if (radicand->rows[r].cells[c].data) {
                         row_push(row, radicand->rows[r].cells[c].data);
                     }
@@ -1529,8 +1529,8 @@ static TexSketch *render_sqrt(TexNodeArray *nodes, int node_id, bool use_serif, 
     }
 
     // Multi-line: use box drawing
-    int rad_width = radicand->rows[0].count;
-    int new_height = radicand->height + 1;
+    int32_t rad_width = radicand->rows[0].count;
+    int32_t new_height = radicand->height + 1;
 
     TexRow *rows = calloc(new_height, sizeof(TexRow));
 
@@ -1538,13 +1538,13 @@ static TexSketch *render_sqrt(TexNodeArray *nodes, int node_id, bool use_serif, 
     row_init(&rows[0]);
     row_push(&rows[0], " ");
     row_push(&rows[0], "┌");
-    for (int i = 0; i < rad_width; i++) {
+    for (int32_t i = 0; i < rad_width; i++) {
         row_push(&rows[0], "─");
     }
     row_push(&rows[0], "╴");
 
     // Content rows
-    for (int r = 0; r < radicand->height; r++) {
+    for (int32_t r = 0; r < radicand->height; r++) {
         row_init(&rows[r + 1]);
 
         if (r == radicand->height - 1) {
@@ -1558,11 +1558,11 @@ static TexSketch *render_sqrt(TexNodeArray *nodes, int node_id, bool use_serif, 
         }
 
         // Content
-        for (int c = 0; c < radicand->rows[r].count; c++) {
+        for (int32_t c = 0; c < radicand->rows[r].count; c++) {
             row_push(&rows[r + 1], radicand->rows[r].cells[c].data);
         }
         // Padding
-        for (int c = radicand->rows[r].count; c < rad_width; c++) {
+        for (int32_t c = radicand->rows[r].count; c < rad_width; c++) {
             row_push(&rows[r + 1], TEX_BG);
         }
         row_push(&rows[r + 1], TEX_BG);
@@ -1575,35 +1575,35 @@ static TexSketch *render_sqrt(TexNodeArray *nodes, int node_id, bool use_serif, 
         TexSketch *shrunk_deg = util_shrink(degree, 1, false, false);
         if (!shrunk_deg) shrunk_deg = sketch_clone(degree);
 
-        int deg_width = shrunk_deg->rows[0].count;
+        int32_t deg_width = shrunk_deg->rows[0].count;
 
         // Insert degree in bottom-left area
         if (new_height >= 2 && deg_width > 0) {
-            int insert_row = new_height - 2;
+            int32_t insert_row = new_height - 2;
             if (insert_row >= 0 && sqrt_sketch->rows[insert_row].count > 0) {
                 // Pad left side with degree
                 TexRow *new_rows = calloc(new_height, sizeof(TexRow));
-                for (int r = 0; r < new_height; r++) {
+                for (int32_t r = 0; r < new_height; r++) {
                     row_init(&new_rows[r]);
                     if (r == insert_row) {
                         // Add degree chars
-                        for (int c = 0; c < shrunk_deg->rows[0].count; c++) {
+                        for (int32_t c = 0; c < shrunk_deg->rows[0].count; c++) {
                             row_push(&new_rows[r], shrunk_deg->rows[0].cells[c].data);
                         }
                     } else {
                         // Add padding
-                        for (int c = 0; c < deg_width; c++) {
+                        for (int32_t c = 0; c < deg_width; c++) {
                             row_push(&new_rows[r], TEX_BG);
                         }
                     }
                     // Add original row
-                    for (int c = 0; c < sqrt_sketch->rows[r].count; c++) {
+                    for (int32_t c = 0; c < sqrt_sketch->rows[r].count; c++) {
                         row_push(&new_rows[r], sqrt_sketch->rows[r].cells[c].data);
                     }
                 }
 
                 // Free old rows and replace
-                for (int r = 0; r < sqrt_sketch->height; r++) {
+                for (int32_t r = 0; r < sqrt_sketch->height; r++) {
                     row_free(&sqrt_sketch->rows[r]);
                 }
                 free(sqrt_sketch->rows);
@@ -1621,7 +1621,7 @@ static TexSketch *render_sqrt(TexNodeArray *nodes, int node_id, bool use_serif, 
 }
 
 //! Render binomial coefficient
-static TexSketch *render_binom(TexNodeArray *nodes, int node_id, bool use_serif, bool inline_mode) {
+static TexSketch *render_binom(TexNodeArray *nodes, int32_t node_id, bool use_serif, bool inline_mode) {
     TexNode *node = &nodes->nodes[node_id];
     if (node->children.count < 2) return sketch_empty();
 
@@ -1634,11 +1634,11 @@ static TexSketch *render_binom(TexNodeArray *nodes, int node_id, bool use_serif,
         row_init(row);
         row_push(row, "C");
         row_push(row, "(");
-        for (int c = 0; c < n->rows[0].count; c++) {
+        for (int32_t c = 0; c < n->rows[0].count; c++) {
             if (n->rows[0].cells[c].data) row_push(row, n->rows[0].cells[c].data);
         }
         row_push(row, ",");
-        for (int c = 0; c < r->rows[0].count; c++) {
+        for (int32_t c = 0; c < r->rows[0].count; c++) {
             if (r->rows[0].cells[c].data) row_push(row, r->rows[0].cells[c].data);
         }
         row_push(row, ")");
@@ -1647,13 +1647,13 @@ static TexSketch *render_binom(TexNodeArray *nodes, int node_id, bool use_serif,
         return sketch_from_rows(row, 1, 0);
     }
 
-    int max_width = n->rows[0].count;
+    int32_t max_width = n->rows[0].count;
     if (r->rows[0].count > max_width) max_width = r->rows[0].count;
 
     // Create separator
     TexRow *sep_row = malloc(sizeof(TexRow));
     row_init(sep_row);
-    for (int i = 0; i < max_width; i++) {
+    for (int32_t i = 0; i < max_width; i++) {
         row_push(sep_row, TEX_BG);
     }
     TexSketch *sep = sketch_from_rows(sep_row, 1, 0);
@@ -1662,8 +1662,8 @@ static TexSketch *render_binom(TexNodeArray *nodes, int node_id, bool use_serif,
     TexSketch *piled = util_vert_pile(n, sep, 0, r, TEX_ALIGN_CENTER);
 
     // Add parentheses
-    int height = piled->height;
-    int horizon = piled->horizon;
+    int32_t height = piled->height;
+    int32_t horizon = piled->horizon;
 
     TexSketch *left = util_delimiter("(", height, horizon);
     TexSketch *right = util_delimiter(")", height, horizon);
@@ -1682,13 +1682,13 @@ static TexSketch *render_binom(TexNodeArray *nodes, int node_id, bool use_serif,
 }
 
 //! Render open delimiter (\left ... \right)
-static TexSketch *render_open_delim(TexNodeArray *nodes, int node_id, bool use_serif, bool inline_mode) {
+static TexSketch *render_open_delim(TexNodeArray *nodes, int32_t node_id, bool use_serif, bool inline_mode) {
     TexNode *node = &nodes->nodes[node_id];
     if (node->children.count < 2) return sketch_empty();
 
     // First and last children are delimiters
-    int left_id = node->children.data[0];
-    int right_id = node->children.data[node->children.count - 1];
+    int32_t left_id = node->children.data[0];
+    int32_t right_id = node->children.data[node->children.count - 1];
 
     // Get delimiter characters
     TexSketch *left_leaf = render_node(nodes, left_id, use_serif, inline_mode);
@@ -1699,15 +1699,15 @@ static TexSketch *render_open_delim(TexNodeArray *nodes, int node_id, bool use_s
         right_leaf->rows[0].cells[0].data : ")";
 
     // Render inside content
-    int inside_count = node->children.count - 2;
+    int32_t inside_count = node->children.count - 2;
     TexSketch *inside;
     if (inside_count > 0) {
         TexSketch **parts = calloc(inside_count, sizeof(TexSketch *));
-        for (int i = 0; i < inside_count; i++) {
+        for (int32_t i = 0; i < inside_count; i++) {
             parts[i] = render_node(nodes, node->children.data[i + 1], use_serif, inline_mode);
         }
         inside = util_concat(parts, inside_count, false, false);
-        for (int i = 0; i < inside_count; i++) {
+        for (int32_t i = 0; i < inside_count; i++) {
             tex_sketch_free(parts[i]);
         }
         free(parts);
@@ -1721,7 +1721,7 @@ static TexSketch *render_open_delim(TexNodeArray *nodes, int node_id, bool use_s
         row_init(row);
         row_push(row, left_char);
         if (inside && inside->height > 0) {
-            for (int c = 0; c < inside->rows[0].count; c++) {
+            for (int32_t c = 0; c < inside->rows[0].count; c++) {
                 if (inside->rows[0].cells[c].data) row_push(row, inside->rows[0].cells[c].data);
             }
         }
@@ -1732,8 +1732,8 @@ static TexSketch *render_open_delim(TexNodeArray *nodes, int node_id, bool use_s
         return sketch_from_rows(row, 1, 0);
     }
 
-    int height = inside->height;
-    int horizon = inside->horizon;
+    int32_t height = inside->height;
+    int32_t horizon = inside->horizon;
 
     TexSketch *left = util_delimiter(left_char, height, horizon);
     TexSketch *right = util_delimiter(right_char, height, horizon);
@@ -1751,7 +1751,7 @@ static TexSketch *render_open_delim(TexNodeArray *nodes, int node_id, bool use_s
 }
 
 //! Render big delimiter
-static TexSketch *render_big_delim(TexNodeArray *nodes, int node_id, bool use_serif, bool inline_mode) {
+static TexSketch *render_big_delim(TexNodeArray *nodes, int32_t node_id, bool use_serif, bool inline_mode) {
     TexNode *node = &nodes->nodes[node_id];
     if (node->children.count < 1) return sketch_empty();
 
@@ -1769,7 +1769,7 @@ static TexSketch *render_big_delim(TexNodeArray *nodes, int node_id, bool use_se
     }
 
     // Get height from command
-    int height = 1;
+    int32_t height = 1;
     const char *cmd = node->token.value;
     if (strcmp(cmd, "Big") == 0 || strcmp(cmd, "Bigl") == 0 || strcmp(cmd, "Bigr") == 0) height = 3;
     else if (strcmp(cmd, "bigg") == 0 || strcmp(cmd, "biggl") == 0 || strcmp(cmd, "biggr") == 0) height = 5;
@@ -1781,7 +1781,7 @@ static TexSketch *render_big_delim(TexNodeArray *nodes, int node_id, bool use_se
 }
 
 //! Render accent
-static TexSketch *render_accent(TexNodeArray *nodes, int node_id, bool use_serif, bool inline_mode) {
+static TexSketch *render_accent(TexNodeArray *nodes, int32_t node_id, bool use_serif, bool inline_mode) {
     TexNode *node = &nodes->nodes[node_id];
     if (node->children.count < 1) return sketch_empty();
 
@@ -1806,7 +1806,7 @@ static TexSketch *render_accent(TexNodeArray *nodes, int node_id, bool use_serif
 }
 
 //! Render font command
-static TexSketch *render_font_cmd(TexNodeArray *nodes, int node_id, bool use_serif, bool inline_mode) {
+static TexSketch *render_font_cmd(TexNodeArray *nodes, int32_t node_id, bool use_serif, bool inline_mode) {
     TexNode *node = &nodes->nodes[node_id];
     if (node->children.count < 1) return sketch_empty();
 
@@ -1817,20 +1817,20 @@ static TexSketch *render_font_cmd(TexNodeArray *nodes, int node_id, bool use_ser
 }
 
 //! Render line with ampersand alignment
-static TexSketch *render_line_align_amp(TexNodeArray *nodes, int node_id, bool use_serif, bool inline_mode) {
+static TexSketch *render_line_align_amp(TexNodeArray *nodes, int32_t node_id, bool use_serif, bool inline_mode) {
     TexNode *node = &nodes->nodes[node_id];
-    int child_count = node->children.count;
+    int32_t child_count = node->children.count;
 
     if (child_count == 0) return sketch_empty();
 
     TexSketch **children = calloc(child_count, sizeof(TexSketch *));
-    for (int i = 0; i < child_count; i++) {
+    for (int32_t i = 0; i < child_count; i++) {
         children[i] = render_node(nodes, node->children.data[i], use_serif, inline_mode);
     }
 
     TexSketch *result = util_concat(children, child_count, true, true);
 
-    for (int i = 0; i < child_count; i++) {
+    for (int32_t i = 0; i < child_count; i++) {
         tex_sketch_free(children[i]);
     }
     free(children);
@@ -1839,21 +1839,21 @@ static TexSketch *render_line_align_amp(TexNodeArray *nodes, int node_id, bool u
 }
 
 //! Render line without ampersand alignment
-static TexSketch *render_line_no_align(TexNodeArray *nodes, int node_id, bool use_serif, bool inline_mode) {
+static TexSketch *render_line_no_align(TexNodeArray *nodes, int32_t node_id, bool use_serif, bool inline_mode) {
     TexNode *node = &nodes->nodes[node_id];
-    int child_count = node->children.count;
+    int32_t child_count = node->children.count;
 
     if (child_count == 0) return sketch_empty();
 
     TexSketch **children = calloc(child_count, sizeof(TexSketch *));
-    for (int i = 0; i < child_count; i++) {
+    for (int32_t i = 0; i < child_count; i++) {
         children[i] = render_node(nodes, node->children.data[i], use_serif, inline_mode);
     }
 
     TexSketch *result = util_concat(children, child_count, true, false);
     result->horizon = -2;  // Special marker for no ampersand alignment
 
-    for (int i = 0; i < child_count; i++) {
+    for (int32_t i = 0; i < child_count; i++) {
         tex_sketch_free(children[i]);
     }
     free(children);
@@ -1862,7 +1862,7 @@ static TexSketch *render_line_no_align(TexNodeArray *nodes, int node_id, bool us
 }
 
 //! Render substack
-static TexSketch *render_substack(TexNodeArray *nodes, int node_id, bool use_serif, bool inline_mode) {
+static TexSketch *render_substack(TexNodeArray *nodes, int32_t node_id, bool use_serif, bool inline_mode) {
     TexNode *node = &nodes->nodes[node_id];
     if (node->children.count == 0) return sketch_empty();
 
@@ -1870,11 +1870,11 @@ static TexSketch *render_substack(TexNodeArray *nodes, int node_id, bool use_ser
     if (inline_mode) {
         TexRow *row = malloc(sizeof(TexRow));
         row_init(row);
-        for (int i = 0; i < node->children.count; i++) {
+        for (int32_t i = 0; i < node->children.count; i++) {
             if (i > 0) row_push(row, ",");
             TexSketch *child = render_node(nodes, node->children.data[i], use_serif, inline_mode);
             if (child && child->height > 0) {
-                for (int c = 0; c < child->rows[0].count; c++) {
+                for (int32_t c = 0; c < child->rows[0].count; c++) {
                     if (child->rows[0].cells[c].data) row_push(row, child->rows[0].cells[c].data);
                 }
             }
@@ -1886,7 +1886,7 @@ static TexSketch *render_substack(TexNodeArray *nodes, int node_id, bool use_ser
     // Render children and stack vertically
     TexSketch *result = render_node(nodes, node->children.data[0], use_serif, inline_mode);
 
-    for (int i = 1; i < node->children.count; i++) {
+    for (int32_t i = 1; i < node->children.count; i++) {
         TexSketch *child = render_node(nodes, node->children.data[i], use_serif, inline_mode);
         TexSketch *sep = sketch_empty();
         TexSketch *new_result = util_vert_pile(result, sep, 0, child, TEX_ALIGN_CENTER);
@@ -1900,14 +1900,14 @@ static TexSketch *render_substack(TexNodeArray *nodes, int node_id, bool use_ser
 }
 
 //! Render root (vertical stack of lines)
-static TexSketch *render_root(TexNodeArray *nodes, int node_id, bool use_serif, bool inline_mode) {
+static TexSketch *render_root(TexNodeArray *nodes, int32_t node_id, bool use_serif, bool inline_mode) {
     TexNode *node = &nodes->nodes[node_id];
     if (node->children.count == 0) return sketch_empty();
 
     // Render first child
     TexSketch *result = render_node(nodes, node->children.data[0], use_serif, inline_mode);
 
-    for (int i = 1; i < node->children.count; i++) {
+    for (int32_t i = 1; i < node->children.count; i++) {
         TexSketch *child = render_node(nodes, node->children.data[i], use_serif, inline_mode);
 
         // Create separator (single background cell)
@@ -1927,7 +1927,7 @@ static TexSketch *render_root(TexNodeArray *nodes, int node_id, bool use_serif, 
 }
 
 //! Main node rendering dispatch
-static TexSketch *render_node(TexNodeArray *nodes, int node_id, bool use_serif, bool inline_mode) {
+static TexSketch *render_node(TexNodeArray *nodes, int32_t node_id, bool use_serif, bool inline_mode) {
     if (node_id < 0 || node_id >= nodes->count) return sketch_empty();
 
     TexNode *node = &nodes->nodes[node_id];
@@ -1962,7 +1962,7 @@ static TexSketch *render_node(TexNodeArray *nodes, int node_id, bool use_serif, 
         case TEX_NT_CMD_BGIN:
             // Check if align environment
             if (node->children.count > 0) {
-                int env_id = node->children.data[0];
+                int32_t env_id = node->children.data[0];
                 TexNode *env_node = &nodes->nodes[env_id];
                 // Check for align environment name
                 bool is_align = false;
@@ -1972,14 +1972,14 @@ static TexSketch *render_node(TexNodeArray *nodes, int node_id, bool use_serif, 
                 }
                 if (is_align) {
                     // Render children[1:] with alignment
-                    int child_count = node->children.count - 1;
+                    int32_t child_count = node->children.count - 1;
                     if (child_count > 0) {
                         TexSketch **children = calloc(child_count, sizeof(TexSketch *));
-                        for (int i = 0; i < child_count; i++) {
+                        for (int32_t i = 0; i < child_count; i++) {
                             children[i] = render_node(nodes, node->children.data[i + 1], use_serif, inline_mode);
                         }
                         base = util_concat(children, child_count, true, true);
-                        for (int i = 0; i < child_count; i++) {
+                        for (int32_t i = 0; i < child_count; i++) {
                             tex_sketch_free(children[i]);
                         }
                         free(children);
@@ -2130,7 +2130,7 @@ static TexSketch *tex_render_string_internal(const char *latex, size_t len, bool
     if (!latex || len == 0) return sketch_empty();
 
     // Tokenize
-    int token_count = 0;
+    int32_t token_count = 0;
     TexToken *tokens = tex_lex(latex, len, &token_count);
     if (!tokens || token_count == 0) {
         free(tokens);

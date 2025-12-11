@@ -23,6 +23,12 @@ void footnote_jump(GapBuffer *gb, size_t *cursor);
 //! @return true if definition was created
 bool footnote_create_definition(GapBuffer *gb, const char *id);
 
+//! Check if cursor just completed a footnote reference and create definition if needed
+//! Called after user types ']' to auto-create missing footnote definitions
+//! @param gb gap buffer containing text
+//! @param cursor current cursor position
+void footnote_maybe_create_at_cursor(GapBuffer *gb, size_t cursor);
+
 // #endregion
 
 #endif // DAWN_FOOTNOTE_H

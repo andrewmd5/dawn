@@ -24,22 +24,22 @@
 typedef struct {
     size_t pos;                         //!< Byte position of match
     size_t len;                         //!< Length of match
-    int line_num;                       //!< Line number (1-indexed)
+    int32_t line_num;                       //!< Line number (1-indexed)
     char context[SEARCH_CONTEXT_CHARS * 2 + SEARCH_MAX_QUERY + 8]; //!< Context with match
-    int context_len;                    //!< Context length
-    int match_start;                    //!< Match start within context
-    int match_len;                      //!< Match length in context
+    int32_t context_len;                    //!< Context length
+    int32_t match_start;                    //!< Match start within context
+    int32_t match_len;                      //!< Match length in context
 } SearchResult;
 
 //! Search state
 typedef struct {
     SearchResult results[SEARCH_MAX_RESULTS];  //!< All results
-    int count;                                 //!< Number of results
-    int selected;                              //!< Selected result index
+    int32_t count;                                 //!< Number of results
+    int32_t selected;                              //!< Selected result index
     char query[SEARCH_MAX_QUERY];              //!< Search query
-    int query_len;                             //!< Query length
-    int query_cursor;                          //!< Query cursor position
-    int scroll;                                //!< Scroll offset
+    int32_t query_len;                             //!< Query length
+    int32_t query_cursor;                          //!< Query cursor position
+    int32_t scroll;                                //!< Scroll offset
     bool case_sensitive;                       //!< Case sensitivity
 } SearchState;
 

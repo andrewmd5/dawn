@@ -19,8 +19,7 @@
 
 char *history_dir(void) {
     static char path[PATH_MAX];
-    const PlatformBackend *p = platform_get();
-    const char *home = p && p->get_home_dir ? p->get_home_dir() : "/tmp";
+    const char *home = DAWN_BACKEND(app)->home_dir();
     snprintf(path, sizeof(path), "%s/%s", home ? home : "/tmp", HISTORY_DIR_NAME);
     return path;
 }
@@ -31,11 +30,7 @@ char *history_dir(void) {
 
 //! Get current user's display name for document metadata
 static const char *get_username(void) {
-    const PlatformBackend *p = platform_get();
-    if (p && p->get_username) {
-        return p->get_username();
-    }
-    return "Unknown";
+    return DAWN_BACKEND(app)->username();
 }
 
 // #endregion
@@ -43,19 +38,16 @@ static const char *get_username(void) {
 // #region Session Persistence
 
 void save_session(void) {
-    const PlatformBackend *p = platform_get();
-    if (!p) return;
-
     if (gap_len(&app.text) == 0) return;
 
     // Ensure history directory exists
-    p->mkdir_p(history_dir());
+    DAWN_BACKEND(app)->mkdir_p(history_dir());
 
     // Generate new path if first save
     if (!app.session_path) {
         static char path[PATH_MAX];
-        PlatformLocalTime lt;
-        p->get_local_time(&lt);
+        DawnTime lt;
+        DAWN_BACKEND(app)->localtime(&lt);
         snprintf(path, sizeof(path), "%s/%04d-%02d-%02d_%02d%02d%02d.md",
                  history_dir(), lt.year, lt.mon + 1, lt.mday, lt.hour, lt.min, lt.sec);
         app.session_path = strdup(path);
@@ -65,14 +57,14 @@ void save_session(void) {
     char *txt = gap_to_str(&app.text);
     size_t txt_len = strlen(txt);
 
-    PlatformLocalTime lt;
-    p->get_local_time(&lt);
+    DawnTime lt;
+    DAWN_BACKEND(app)->localtime(&lt);
 
     // Estimate frontmatter size
     size_t fm_size = 256;
     char *content = malloc(fm_size + txt_len + 16);
 
-    int fm_len = snprintf(content, fm_size,
+    int32_t fm_len = snprintf(content, fm_size,
         "---\n"
         "title: %s\n"
         "author: %s\n"
@@ -85,7 +77,7 @@ void save_session(void) {
     memcpy(content + fm_len, txt, txt_len);
     content[fm_len + txt_len] = '\0';
 
-    p->write_file(app.session_path, content, fm_len + txt_len);
+    DAWN_BACKEND(app)->write_file(app.session_path, content, fm_len + txt_len);
 
     free(content);
     free(txt);
@@ -102,7 +94,7 @@ void save_session(void) {
 
         json_len += snprintf(json + json_len, json_cap - json_len, "[\n");
 
-        for (int i = 0; i < app.chat_count; i++) {
+        for (int32_t i = 0; i < app.chat_count; i++) {
             ChatMessage *m = &app.chat_msgs[i];
 
             // Ensure capacity
@@ -136,7 +128,7 @@ void save_session(void) {
 
         json_len += snprintf(json + json_len, json_cap - json_len, "]\n");
 
-        p->write_file(chat_path, json, json_len);
+        DAWN_BACKEND(app)->write_file(chat_path, json, json_len);
         free(json);
     }
 }
@@ -145,11 +137,8 @@ void save_session(void) {
 //! @param path path to .md file
 //! @return newly allocated title string, or NULL if not found
 static char *parse_frontmatter_title(const char *path) {
-    const PlatformBackend *p = platform_get();
-    if (!p || !p->read_file) return NULL;
-
     size_t len;
-    char *content = p->read_file(path, &len);
+    char *content = DAWN_BACKEND(app)->read_file(path, &len);
     if (!content) return NULL;
 
     char *title = NULL;
@@ -178,12 +167,9 @@ static char *parse_frontmatter_title(const char *path) {
 }
 
 void load_history(void) {
-    const PlatformBackend *p = platform_get();
-    if (!p) return;
-
     // Free existing history
     if (app.history) {
-        for (int i = 0; i < app.hist_count; i++) {
+        for (int32_t i = 0; i < app.hist_count; i++) {
             free(app.history[i].path);
             free(app.history[i].title);
             free(app.history[i].date_str);
@@ -194,15 +180,15 @@ void load_history(void) {
     }
 
     char **names;
-    int count;
-    if (!p->list_dir(history_dir(), &names, &count)) {
+    int32_t count;
+    if (!DAWN_BACKEND(app)->list_dir(history_dir(), &names, &count)) {
         return;
     }
 
-    int cap = 64;
+    int32_t cap = 64;
     app.history = malloc(sizeof(HistoryEntry) * (size_t)cap);
 
-    for (int i = 0; i < count; i++) {
+    for (int32_t i = 0; i < count; i++) {
         // Only .md files, skip .chat.json
         size_t nlen = strlen(names[i]);
         if (nlen < 3 || strcmp(names[i] + nlen - 3, ".md") != 0) {
@@ -223,7 +209,7 @@ void load_history(void) {
         entry->title = parse_frontmatter_title(full);
 
         // Parse date from filename (format: YYYY-MM-DD_HHMM.md)
-        int y, mo, da, h, mi;
+        int32_t y, mo, da, h, mi;
         if (sscanf(names[i], "%d-%d-%d_%d%d", &y, &mo, &da, &h, &mi) == 5) {
             static const char *months[] = {"","Jan","Feb","Mar","Apr","May","Jun",
                                            "Jul","Aug","Sep","Oct","Nov","Dec"};
@@ -241,8 +227,8 @@ void load_history(void) {
     free(names);
 
     // Sort newest first (by path, which contains date)
-    for (int i = 0; i < app.hist_count - 1; i++) {
-        for (int j = i + 1; j < app.hist_count; j++) {
+    for (int32_t i = 0; i < app.hist_count - 1; i++) {
+        for (int32_t j = i + 1; j < app.hist_count; j++) {
             if (strcmp(app.history[i].path, app.history[j].path) < 0) {
                 HistoryEntry tmp = app.history[i];
                 app.history[i] = app.history[j];
@@ -253,14 +239,11 @@ void load_history(void) {
 }
 
 void load_chat_history(const char *session_path) {
-    const PlatformBackend *p = platform_get();
-    if (!p || !p->read_file) return;
-
     char chat_path[520];
     get_chat_path(session_path, chat_path, sizeof(chat_path));
 
     size_t size;
-    char *json_str = p->read_file(chat_path, &size);
+    char *json_str = DAWN_BACKEND(app)->read_file(chat_path, &size);
     if (!json_str) return;
 
     cJSON *root = cJSON_Parse(json_str);
@@ -286,14 +269,11 @@ void load_chat_history(const char *session_path) {
 
 // #region File Operations
 
-void load_file_for_editing(const char *path) {
-    const PlatformBackend *p = platform_get();
-    if (!p || !p->read_file) return;
-
-    size_t size;
-    char *content = p->read_file(path, &size);
-    if (!content) return;
-
+//! Load content into editor, parsing frontmatter
+//! @param content buffer containing markdown content (will be modified)
+//! @param size size of content buffer
+//! @param path optional file path (NULL for stdin)
+static void load_content(char *content, size_t size, const char *path) {
     // Parse and strip frontmatter
     free(app.session_title);
     app.session_title = NULL;
@@ -330,21 +310,13 @@ void load_file_for_editing(const char *path) {
         text_len = normalize_line_endings(text_start, text_len);
         gap_insert_str(&app.text, 0, text_start, text_len);
     }
-    free(content);
 
     // Clear image cache when switching documents
     image_clear_all();
 
-    // Get base directory from file path for image resolution
-    char base_dir[512] = "";
-    strncpy(base_dir, path, sizeof(base_dir) - 1);
-    char *last_slash = strrchr(base_dir, '/');
-    if (last_slash) *last_slash = '\0';
-    else base_dir[0] = '\0';
-
     // Reset editor state
     free(app.session_path);
-    app.session_path = strdup(path);
+    app.session_path = path ? strdup(path) : NULL;
     app.cursor = 0;
     app.scroll_y = 0;
     app.selecting = false;
@@ -358,8 +330,10 @@ void load_file_for_editing(const char *path) {
     app.chat_scroll = 0;
     chat_clear();
 
-    // Load associated chat history
-    load_chat_history(path);
+    // Load associated chat history (only for files)
+    if (path) {
+        load_chat_history(path);
+    }
 
     #if HAS_LIBAI
     if (app.ai_ready && !app.ai_session) {
@@ -367,16 +341,33 @@ void load_file_for_editing(const char *path) {
     }
     #endif
 
-    if (p && p->set_title) {
-        p->set_title(app.session_title);
-    }
+    DAWN_BACKEND(app)->set_title(app.session_title);
+}
+
+void load_file_for_editing(const char *path) {
+    size_t size;
+    char *content = DAWN_BACKEND(app)->read_file(path, &size);
+    if (!content) return;
+
+    load_content(content, size, path);
+    free(content);
+}
+
+void load_buffer_for_editing(const char *content, size_t size) {
+    if (!content || size == 0) return;
+
+    // Make a mutable copy
+    char *buf = malloc(size + 1);
+    if (!buf) return;
+    memcpy(buf, content, size);
+    buf[size] = '\0';
+
+    load_content(buf, size, NULL);
+    free(buf);
 }
 
 void open_in_finder(const char *path) {
-    const PlatformBackend *p = platform_get();
-    if (p && p->reveal_in_finder) {
-        p->reveal_in_finder(path);
-    }
+    DAWN_BACKEND(app)->reveal(path);
 }
 
 // #endregion

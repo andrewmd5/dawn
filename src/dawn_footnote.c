@@ -22,27 +22,27 @@ typedef struct {
 //! @param gb gap buffer to scan
 //! @param count output: number of footnotes found
 //! @return array of FootnoteInfo (caller must free)
-static FootnoteInfo *scan_footnotes(GapBuffer *gb, int *count) {
+static FootnoteInfo *scan_footnotes(GapBuffer *gb, int32_t *count) {
     *count = 0;
     size_t len = gap_len(gb);
     FootnoteInfo *notes = NULL;
-    int capacity = 0;
+    int32_t capacity = 0;
 
     // First pass: find all references
     for (size_t pos = 0; pos < len; pos++) {
-        size_t id_start, id_len, total;
-        if (md_check_footnote_ref(gb, pos, &id_start, &id_len, &total)) {
+        MdMatch ref;
+        if (md_check_footnote_ref(gb, pos, &ref)) {
             // Extract ID
             char id[64];
-            size_t idl = id_len < sizeof(id) - 1 ? id_len : sizeof(id) - 1;
+            size_t idl = ref.span.len < sizeof(id) - 1 ? ref.span.len : sizeof(id) - 1;
             for (size_t i = 0; i < idl; i++) {
-                id[i] = gap_at(gb, id_start + i);
+                id[i] = gap_at(gb, ref.span.start + i);
             }
             id[idl] = '\0';
 
             // Check if we already have this ID
             bool found = false;
-            for (int i = 0; i < *count; i++) {
+            for (int32_t i = 0; i < *count; i++) {
                 if (strcmp(notes[i].id, id) == 0) {
                     found = true;
                     break;
@@ -61,23 +61,23 @@ static FootnoteInfo *scan_footnotes(GapBuffer *gb, int *count) {
                 (*count)++;
             }
 
-            pos += total - 1;
+            pos += ref.total_len - 1;
         }
     }
 
     // Second pass: find definitions
     for (size_t pos = 0; pos < len; pos++) {
-        size_t id_start, id_len, content_start, total;
-        if (md_check_footnote_def(gb, pos, &id_start, &id_len, &content_start, &total)) {
+        MdMatch2 def;
+        if (md_check_footnote_def(gb, pos, &def)) {
             char id[64];
-            size_t idl = id_len < sizeof(id) - 1 ? id_len : sizeof(id) - 1;
+            size_t idl = def.spans[0].len < sizeof(id) - 1 ? def.spans[0].len : sizeof(id) - 1;
             for (size_t i = 0; i < idl; i++) {
-                id[i] = gap_at(gb, id_start + i);
+                id[i] = gap_at(gb, def.spans[0].start + i);
             }
             id[idl] = '\0';
 
             // Match to references
-            for (int i = 0; i < *count; i++) {
+            for (int32_t i = 0; i < *count; i++) {
                 if (strcmp(notes[i].id, id) == 0) {
                     notes[i].def_pos = pos;
                     break;
@@ -93,7 +93,7 @@ static FootnoteInfo *scan_footnotes(GapBuffer *gb, int *count) {
 //! @param gb gap buffer to modify
 //! @return position of first new definition, or SIZE_MAX if none created
 static size_t create_missing_footnotes(GapBuffer *gb) {
-    int count;
+    int32_t count;
     FootnoteInfo *notes = scan_footnotes(gb, &count);
     if (!notes || count == 0) {
         free(notes);
@@ -101,8 +101,8 @@ static size_t create_missing_footnotes(GapBuffer *gb) {
     }
 
     // Find which ones are missing
-    int missing = 0;
-    for (int i = 0; i < count; i++) {
+    int32_t missing = 0;
+    for (int32_t i = 0; i < count; i++) {
         if (notes[i].def_pos == SIZE_MAX) missing++;
     }
 
@@ -133,7 +133,7 @@ static size_t create_missing_footnotes(GapBuffer *gb) {
     }
 
     // Add missing definitions
-    for (int i = 0; i < count; i++) {
+    for (int32_t i = 0; i < count; i++) {
         if (notes[i].def_pos == SIZE_MAX) {
             if (first_new == SIZE_MAX) {
                 first_new = insert_pos;
@@ -174,29 +174,29 @@ void footnote_jump(GapBuffer *gb, size_t *cursor) {
     size_t cur = *cursor;
 
     // Check if cursor is in a footnote reference
-    size_t id_start, id_len, total;
-    if (md_check_footnote_ref(gb, cur, &id_start, &id_len, &total)) {
+    MdMatch ref;
+    if (md_check_footnote_ref(gb, cur, &ref)) {
         // Extract ID
         char id[64];
-        size_t idl = id_len < sizeof(id) - 1 ? id_len : sizeof(id) - 1;
+        size_t idl = ref.span.len < sizeof(id) - 1 ? ref.span.len : sizeof(id) - 1;
         for (size_t i = 0; i < idl; i++) {
-            id[i] = gap_at(gb, id_start + i);
+            id[i] = gap_at(gb, ref.span.start + i);
         }
         id[idl] = '\0';
 
         // Find definition
         for (size_t pos = 0; pos < len; pos++) {
-            size_t def_id_start, def_id_len, content_start, def_total;
-            if (md_check_footnote_def(gb, pos, &def_id_start, &def_id_len, &content_start, &def_total)) {
+            MdMatch2 def;
+            if (md_check_footnote_def(gb, pos, &def)) {
                 char def_id[64];
-                size_t dl = def_id_len < sizeof(def_id) - 1 ? def_id_len : sizeof(def_id) - 1;
+                size_t dl = def.spans[0].len < sizeof(def_id) - 1 ? def.spans[0].len : sizeof(def_id) - 1;
                 for (size_t i = 0; i < dl; i++) {
-                    def_id[i] = gap_at(gb, def_id_start + i);
+                    def_id[i] = gap_at(gb, def.spans[0].start + i);
                 }
                 def_id[dl] = '\0';
 
                 if (strcmp(id, def_id) == 0) {
-                    *cursor = content_start;
+                    *cursor = def.spans[1].start;
                     return;
                 }
             }
@@ -207,17 +207,17 @@ void footnote_jump(GapBuffer *gb, size_t *cursor) {
         if (new_pos != SIZE_MAX) {
             // Find our specific definition
             for (size_t pos = new_pos; pos < gap_len(gb); pos++) {
-                size_t def_id_start, def_id_len, content_start, def_total;
-                if (md_check_footnote_def(gb, pos, &def_id_start, &def_id_len, &content_start, &def_total)) {
+                MdMatch2 def;
+                if (md_check_footnote_def(gb, pos, &def)) {
                     char def_id[64];
-                    size_t dl = def_id_len < sizeof(def_id) - 1 ? def_id_len : sizeof(def_id) - 1;
+                    size_t dl = def.spans[0].len < sizeof(def_id) - 1 ? def.spans[0].len : sizeof(def_id) - 1;
                     for (size_t i = 0; i < dl; i++) {
-                        def_id[i] = gap_at(gb, def_id_start + i);
+                        def_id[i] = gap_at(gb, def.spans[0].start + i);
                     }
                     def_id[dl] = '\0';
 
                     if (strcmp(id, def_id) == 0) {
-                        *cursor = content_start;
+                        *cursor = def.spans[1].start;
                         return;
                     }
                 }
@@ -229,8 +229,9 @@ void footnote_jump(GapBuffer *gb, size_t *cursor) {
     // Check if we're somewhere that could be start of a reference (scan back to find it)
     for (size_t back = 0; back < 10 && cur >= back; back++) {
         size_t check_pos = cur - back;
-        if (md_check_footnote_ref(gb, check_pos, &id_start, &id_len, &total)) {
-            if (check_pos + total > cur) {
+        MdMatch ref_back;
+        if (md_check_footnote_ref(gb, check_pos, &ref_back)) {
+            if (check_pos + ref_back.total_len > cur) {
                 // We're inside this reference - recurse with cursor at start
                 size_t saved = cur;
                 *cursor = check_pos;
@@ -249,24 +250,24 @@ void footnote_jump(GapBuffer *gb, size_t *cursor) {
         line_start--;
     }
 
-    size_t def_id_start, def_id_len, content_start, def_total;
-    if (md_check_footnote_def(gb, line_start, &def_id_start, &def_id_len, &content_start, &def_total)) {
+    MdMatch2 def;
+    if (md_check_footnote_def(gb, line_start, &def)) {
         // Extract ID
         char id[64];
-        size_t idl = def_id_len < sizeof(id) - 1 ? def_id_len : sizeof(id) - 1;
+        size_t idl = def.spans[0].len < sizeof(id) - 1 ? def.spans[0].len : sizeof(id) - 1;
         for (size_t i = 0; i < idl; i++) {
-            id[i] = gap_at(gb, def_id_start + i);
+            id[i] = gap_at(gb, def.spans[0].start + i);
         }
         id[idl] = '\0';
 
         // Find first reference
         for (size_t pos = 0; pos < len; pos++) {
-            size_t ref_id_start, ref_id_len, ref_total;
-            if (md_check_footnote_ref(gb, pos, &ref_id_start, &ref_id_len, &ref_total)) {
+            MdMatch ref_find;
+            if (md_check_footnote_ref(gb, pos, &ref_find)) {
                 char ref_id[64];
-                size_t rl = ref_id_len < sizeof(ref_id) - 1 ? ref_id_len : sizeof(ref_id) - 1;
+                size_t rl = ref_find.span.len < sizeof(ref_id) - 1 ? ref_find.span.len : sizeof(ref_id) - 1;
                 for (size_t i = 0; i < rl; i++) {
-                    ref_id[i] = gap_at(gb, ref_id_start + i);
+                    ref_id[i] = gap_at(gb, ref_find.span.start + i);
                 }
                 ref_id[rl] = '\0';
 
@@ -284,12 +285,12 @@ bool footnote_create_definition(GapBuffer *gb, const char *id) {
 
     // Check if definition already exists
     for (size_t pos = 0; pos < len; pos++) {
-        size_t def_id_start, def_id_len, content_start, def_total;
-        if (md_check_footnote_def(gb, pos, &def_id_start, &def_id_len, &content_start, &def_total)) {
+        MdMatch2 def;
+        if (md_check_footnote_def(gb, pos, &def)) {
             char def_id[64];
-            size_t dl = def_id_len < sizeof(def_id) - 1 ? def_id_len : sizeof(def_id) - 1;
+            size_t dl = def.spans[0].len < sizeof(def_id) - 1 ? def.spans[0].len : sizeof(def_id) - 1;
             for (size_t i = 0; i < dl; i++) {
-                def_id[i] = gap_at(gb, def_id_start + i);
+                def_id[i] = gap_at(gb, def.spans[0].start + i);
             }
             def_id[dl] = '\0';
             if (strcmp(id, def_id) == 0) {
@@ -301,8 +302,8 @@ bool footnote_create_definition(GapBuffer *gb, const char *id) {
     // Check if this is the first footnote definition
     bool first_footnote = true;
     for (size_t pos = 0; pos < len; pos++) {
-        size_t d_id_start, d_id_len, d_content, d_total;
-        if (md_check_footnote_def(gb, pos, &d_id_start, &d_id_len, &d_content, &d_total)) {
+        MdMatch2 def;
+        if (md_check_footnote_def(gb, pos, &def)) {
             first_footnote = false;
             break;
         }
@@ -343,6 +344,28 @@ bool footnote_create_definition(GapBuffer *gb, const char *id) {
     gap_insert(gb, insert_pos, ' ');
 
     return true;
+}
+
+void footnote_maybe_create_at_cursor(GapBuffer *gb, size_t cursor) {
+    if (cursor < 4) return;
+
+    // Search backwards for a footnote reference near cursor
+    for (size_t back = 3; back < 64 && back < cursor; back++) {
+        size_t check_pos = cursor - back - 1;
+        MdMatch ref;
+        if (!md_check_footnote_ref(gb, check_pos, &ref)) continue;
+
+        // Extract ID and create definition
+        char id[64];
+        size_t idl = ref.span.len < sizeof(id) - 1 ? ref.span.len : sizeof(id) - 1;
+        for (size_t i = 0; i < idl; i++) {
+            id[i] = gap_at(gb, ref.span.start + i);
+        }
+        id[idl] = '\0';
+
+        footnote_create_definition(gb, id);
+        return;
+    }
 }
 
 // #endregion

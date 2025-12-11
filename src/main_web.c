@@ -5,14 +5,14 @@
 #ifdef __EMSCRIPTEN__
 
 #include "dawn_app.h"
-#include "platform.h"
+#include "dawn_backend.h"
+#include "dawn_types.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <emscripten.h>
 #include <emscripten/html5.h>
 
-// External declaration of the web platform backend
-extern const PlatformBackend platform_web;
+extern const DawnBackend dawn_backend_web;
 
 // Frame callback for requestAnimationFrame loop
 static void main_loop(void) {
@@ -20,7 +20,7 @@ static void main_loop(void) {
         // App wants to quit
         emscripten_cancel_main_loop();
         dawn_engine_shutdown();
-        platform_shutdown();
+        dawn_ctx_shutdown(&app.ctx);
     }
 }
 
@@ -54,25 +54,25 @@ void dawn_web_save(void) {
 
 // Called from JavaScript to set the theme
 EMSCRIPTEN_KEEPALIVE
-void dawn_web_set_theme(int dark) {
+void dawn_web_set_theme(int32_t dark) {
     // Theme is set at init, would need to add a runtime theme change API
     (void)dark;
 }
 
-int main(int argc, char *argv[]) {
+int32_t main(int32_t argc, char *argv[]) {
     (void)argc;
     (void)argv;
 
-    // Initialize platform backend
-    if (!platform_init(&platform_web)) {
-        fprintf(stderr, "dawn: failed to initialize platform\n");
+    // Initialize backend context
+    if (!dawn_ctx_init(&app.ctx, &dawn_backend_web, DAWN_MODE_INTERACTIVE)) {
+        fprintf(stderr, "dawn: failed to initialize backend\n");
         return 1;
     }
 
     // Initialize Dawn engine with dark theme
     if (!dawn_engine_init(THEME_DARK)) {
         fprintf(stderr, "dawn: failed to initialize engine\n");
-        platform_shutdown();
+        dawn_ctx_shutdown(&app.ctx);
         return 1;
     }
 

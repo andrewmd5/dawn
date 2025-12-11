@@ -1,10 +1,10 @@
-// platform_web.c - Web/Emscripten Platform Backend
+// dawn_backend_web.c - Web/Emscripten Platform Backend
 //! Canvas-based implementation of the platform abstraction layer
 //! Uses Emscripten + Embind for browser integration
 
 #ifdef __EMSCRIPTEN__
 
-#include "platform.h"
+#include "dawn_types.h"
 #include "dawn_wrap.h"  // for utf8_display_width
 
 #include <stdio.h>
@@ -16,7 +16,7 @@
 #include <emscripten/html5.h>
 
 // stb_image for image decoding
-// When building for web, we compile platform_web.c (not platform_posix.c),
+// When building for web, we compile dawn_backend_web.c (not dawn_backend_posix.c),
 // so we need to define the implementation here
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_JPEG
@@ -37,12 +37,12 @@
 static struct {
     bool initialized;
     uint32_t capabilities;
-    int cols;
-    int rows;
-    int cursor_col;      // Current write position (auto-advances)
-    int cursor_row;
-    int draw_cursor_col; // Where to draw visible cursor (set by set_cursor)
-    int draw_cursor_row;
+    int32_t cols;
+    int32_t rows;
+    int32_t cursor_col;      // Current write position (auto-advances)
+    int32_t cursor_row;
+    int32_t draw_cursor_col; // Where to draw visible cursor (set by set_cursor)
+    int32_t draw_cursor_row;
     bool cursor_visible;
 
     // Current text attributes
@@ -53,18 +53,18 @@ static struct {
     bool dim;
     bool underline;
     bool strikethrough;
-    int underline_style;
+    int32_t underline_style;
     uint8_t underline_r, underline_g, underline_b;
 
-    int pending_key;
-    int last_mouse_col;
-    int last_mouse_row;
+    int32_t pending_key;
+    int32_t last_mouse_col;
+    int32_t last_mouse_row;
     bool resize_needed;
     bool quit_requested;
 
-    int key_queue[64];
-    int key_queue_head;
-    int key_queue_tail;
+    int32_t key_queue[64];
+    int32_t key_queue_head;
+    int32_t key_queue_tail;
 } web_state = {0};
 
 
@@ -79,7 +79,7 @@ EM_JS(void, js_init_canvas, (), {
     document.body.style.margin = '0';
     document.body.style.padding = '0';
     document.body.style.overflow = 'hidden';
-    document.body.style.backgroundColor = '#1a1a2e';
+    document.body.style.backgroundDawnColor = '#1a1a2e';
 
     canvas.style.display = 'block';
 
@@ -119,26 +119,26 @@ EM_JS(void, js_init_canvas, (), {
     updateSize();
 });
 
-EM_JS(void, js_get_size, (int* cols, int* rows), {
+EM_JS(void, js_get_size, (int32_t* cols, int32_t* rows), {
     setValue(cols, window.dawnCols || 80, 'i32');
     setValue(rows, window.dawnRows || 24, 'i32');
 });
 
-EM_JS(void, js_clear_screen, (int r, int g, int b), {
+EM_JS(void, js_clear_screen, (int32_t r, int32_t g, int32_t b), {
     const ctx = window.dawnCtx;
     ctx.fillStyle = `rgb(${r},${g},${b})`;
     ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
 });
 
-EM_JS(void, js_set_font, (int bold, int italic), {
+EM_JS(void, js_set_font, (int32_t bold, int32_t italic), {
     const style = (italic ? "italic " : "") + (bold ? "bold " : "");
     window.dawnCtx.font = style + window.dawnFontSize + "px 'SF Mono', 'Monaco', 'Menlo', 'Consolas', 'DejaVu Sans Mono', monospace";
 });
 
-EM_JS(void, js_draw_text_scaled, (int col, int row, const char* text, int scale,
-                                   int fg_r, int fg_g, int fg_b,
-                                   int bg_r, int bg_g, int bg_b,
-                                   int bold, int italic, int dim), {
+EM_JS(void, js_draw_text_scaled, (int32_t col, int32_t row, const char* text, int32_t scale,
+                                   int32_t fg_r, int32_t fg_g, int32_t fg_b,
+                                   int32_t bg_r, int32_t bg_g, int32_t bg_b,
+                                   int32_t bold, int32_t italic, int32_t dim), {
     const ctx = window.dawnCtx;
     const str = UTF8ToString(text);
     const x = (col - 1) * window.dawnCellWidth;
@@ -164,10 +164,10 @@ EM_JS(void, js_draw_text_scaled, (int col, int row, const char* text, int scale,
 });
 
 // Fractional scaling version - scale is cell scale, font_scale is actual font multiplier
-EM_JS(void, js_draw_text_scaled_frac, (int col, int row, const char* text, int cell_scale, double font_scale,
-                                        int fg_r, int fg_g, int fg_b,
-                                        int bg_r, int bg_g, int bg_b,
-                                        int bold, int italic, int dim), {
+EM_JS(void, js_draw_text_scaled_frac, (int32_t col, int32_t row, const char* text, int32_t cell_scale, double font_scale,
+                                        int32_t fg_r, int32_t fg_g, int32_t fg_b,
+                                        int32_t bg_r, int32_t bg_g, int32_t bg_b,
+                                        int32_t bold, int32_t italic, int32_t dim), {
     const ctx = window.dawnCtx;
     const str = UTF8ToString(text);
     const x = (col - 1) * window.dawnCellWidth;
@@ -193,11 +193,11 @@ EM_JS(void, js_draw_text_scaled_frac, (int col, int row, const char* text, int c
     ctx.font = window.dawnFontSize + "px 'SF Mono', 'Monaco', 'Menlo', 'Consolas', 'DejaVu Sans Mono', monospace";
 });
 
-EM_JS(void, js_draw_text, (int col, int row, const char* text, int num_cols,
-                           int fg_r, int fg_g, int fg_b,
-                           int bg_r, int bg_g, int bg_b,
-                           int bold, int italic, int dim,
-                           int underline, int strikethrough), {
+EM_JS(void, js_draw_text, (int32_t col, int32_t row, const char* text, int32_t num_cols,
+                           int32_t fg_r, int32_t fg_g, int32_t fg_b,
+                           int32_t bg_r, int32_t bg_g, int32_t bg_b,
+                           int32_t bold, int32_t italic, int32_t dim,
+                           int32_t underline, int32_t strikethrough), {
     const ctx = window.dawnCtx;
     const str = UTF8ToString(text);
     const x = (col - 1) * window.dawnCellWidth;
@@ -235,7 +235,7 @@ EM_JS(void, js_draw_text, (int col, int row, const char* text, int num_cols,
     }
 });
 
-EM_JS(void, js_draw_cursor, (int col, int row, int r, int g, int b), {
+EM_JS(void, js_draw_cursor, (int32_t col, int32_t row, int32_t r, int32_t g, int32_t b), {
     const ctx = window.dawnCtx;
     const x = (col - 1) * window.dawnCellWidth;
     const y = (row - 1) * window.dawnCellHeight;
@@ -253,7 +253,7 @@ EM_JS(void, js_draw_cursor, (int col, int row, int r, int g, int b), {
     ctx.fillRect(x, y, 2, window.dawnCellHeight);
 });
 
-EM_JS(void, js_clear_rect, (int col, int row, int width, int height, int r, int g, int b), {
+EM_JS(void, js_clear_rect, (int32_t col, int32_t row, int32_t width, int32_t height, int32_t r, int32_t g, int32_t b), {
     const ctx = window.dawnCtx;
     const x = (col - 1) * window.dawnCellWidth;
     const y = (row - 1) * window.dawnCellHeight;
@@ -407,7 +407,7 @@ EM_JS(void, js_sync_filesystem, (), {
 });
 
 // Images
-EM_JS(int, js_display_image, (const char* path, int row, int col, int maxWidth, int maxHeight), {
+EM_JS(int32_t, js_display_image, (const char* path, int32_t row, int32_t col, int32_t maxWidth, int32_t maxHeight), {
     const pathStr = UTF8ToString(path);
 
     // Create image element if not exists
@@ -450,7 +450,7 @@ EM_JS(int, js_display_image, (const char* path, int row, int col, int maxWidth, 
     return Math.ceil(h / window.dawnCellHeight);
 });
 
-EM_JS(int, js_get_image_size, (const char* path, int* width, int* height), {
+EM_JS(int32_t, js_get_image_size, (const char* path, int32_t* width, int32_t* height), {
     const pathStr = UTF8ToString(path);
 
     let img = window.dawnImages?.[pathStr];
@@ -477,8 +477,8 @@ EM_JS(double, js_time_now_double, (), {
     return Date.now() / 1000.0;
 });
 
-EM_JS(void, js_get_local_time, (int* year, int* mon, int* mday,
-                                 int* hour, int* min, int* sec, int* wday), {
+EM_JS(void, js_get_local_time, (int32_t* year, int32_t* mon, int32_t* mday,
+                                 int32_t* hour, int32_t* min, int32_t* sec, int32_t* wday), {
     const d = new Date();
     setValue(year, d.getFullYear(), 'i32');
     setValue(mon, d.getMonth(), 'i32');
@@ -501,7 +501,7 @@ EM_JS(const char*, js_get_username, (), {
 
 // Called from JS when window resizes
 EMSCRIPTEN_KEEPALIVE
-void web_on_resize(int cols, int rows) {
+void web_on_resize(int32_t cols, int32_t rows) {
     web_state.cols = cols;
     web_state.rows = rows;
     web_state.resize_needed = true;
@@ -509,9 +509,9 @@ void web_on_resize(int cols, int rows) {
 
 // Called from JS on key press
 EMSCRIPTEN_KEEPALIVE
-void web_on_key(int key) {
+void web_on_key(int32_t key) {
     // Add to key queue
-    int next_tail = (web_state.key_queue_tail + 1) % 64;
+    int32_t next_tail = (web_state.key_queue_tail + 1) % 64;
     if (next_tail != web_state.key_queue_head) {
         web_state.key_queue[web_state.key_queue_tail] = key;
         web_state.key_queue_tail = next_tail;
@@ -520,22 +520,23 @@ void web_on_key(int key) {
 
 // Called from JS on mouse event
 EMSCRIPTEN_KEEPALIVE
-void web_on_mouse(int col, int row, int button, int pressed) {
+void web_on_mouse(int32_t col, int32_t row, int32_t button, int32_t pressed) {
     web_state.last_mouse_col = col;
     web_state.last_mouse_row = row;
 
     // Queue a click event on mouse down (left button only)
     if (pressed && button == 0) {
-        int next_tail = (web_state.key_queue_tail + 1) % 64;
+        int32_t next_tail = (web_state.key_queue_tail + 1) % 64;
         if (next_tail != web_state.key_queue_head) {
-            web_state.key_queue[web_state.key_queue_tail] = PLATFORM_KEY_MOUSE_CLICK;
+            web_state.key_queue[web_state.key_queue_tail] = DAWN_KEY_MOUSE_CLICK;
             web_state.key_queue_tail = next_tail;
         }
     }
 }
 
 
-static bool web_init(void) {
+static bool web_init(DawnMode mode) {
+    (void)mode;  // Web platform only supports interactive mode
     if (web_state.initialized) return true;
 
     js_init_canvas();
@@ -556,14 +557,14 @@ static bool web_init(void) {
     web_state.cursor_visible = true;
 
     web_state.capabilities =
-        PLATFORM_CAP_TRUE_COLOR |
-        PLATFORM_CAP_SYNC_OUTPUT |
-        PLATFORM_CAP_STYLED_UNDERLINE |
-        PLATFORM_CAP_TEXT_SIZING |
-        PLATFORM_CAP_IMAGES |
-        PLATFORM_CAP_MOUSE |
-        PLATFORM_CAP_BRACKETED_PASTE |
-        PLATFORM_CAP_CLIPBOARD;
+        DAWN_CAP_TRUE_COLOR |
+        DAWN_CAP_SYNC_OUTPUT |
+        DAWN_CAP_STYLED_UNDERLINE |
+        DAWN_CAP_TEXT_SIZING |
+        DAWN_CAP_IMAGES |
+        DAWN_CAP_MOUSE |
+        DAWN_CAP_BRACKETED_PASTE |
+        DAWN_CAP_CLIPBOARD;
 
     web_state.initialized = true;
     return true;
@@ -578,13 +579,13 @@ static uint32_t web_get_capabilities(void) {
     return web_state.capabilities;
 }
 
-static void web_get_size(int *out_cols, int *out_rows) {
+static void web_get_size(int32_t *out_cols, int32_t *out_rows) {
     js_get_size(&web_state.cols, &web_state.rows);
     if (out_cols) *out_cols = web_state.cols;
     if (out_rows) *out_rows = web_state.rows;
 }
 
-static void web_set_cursor(int col, int row) {
+static void web_set_cursor(int32_t col, int32_t row) {
     web_state.cursor_col = col;
     web_state.cursor_row = row;
     // Also update draw position - this is where cursor will be drawn
@@ -596,13 +597,13 @@ static void web_set_cursor_visible(bool visible) {
     web_state.cursor_visible = visible;
 }
 
-static void web_set_fg(PlatformColor color) {
+static void web_set_fg(DawnColor color) {
     web_state.fg_r = color.r;
     web_state.fg_g = color.g;
     web_state.fg_b = color.b;
 }
 
-static void web_set_bg(PlatformColor color) {
+static void web_set_bg(DawnColor color) {
     web_state.bg_r = color.r;
     web_state.bg_g = color.g;
     web_state.bg_b = color.b;
@@ -634,12 +635,12 @@ static void web_set_strikethrough(bool enabled) {
     web_state.strikethrough = enabled;
 }
 
-static void web_set_underline(PlatformUnderlineStyle style) {
+static void web_set_underline(DawnUnderline style) {
     web_state.underline = true;
     web_state.underline_style = style;
 }
 
-static void web_set_underline_color(PlatformColor color) {
+static void web_set_underline_color(DawnColor color) {
     web_state.underline_r = color.r;
     web_state.underline_g = color.g;
     web_state.underline_b = color.b;
@@ -658,12 +659,18 @@ static void web_clear_line(void) {
                   web_state.bg_r, web_state.bg_g, web_state.bg_b);
 }
 
+static void web_clear_range(int32_t count) {
+    if (count <= 0) return;
+    js_clear_rect(web_state.cursor_col, web_state.cursor_row, count, 1,
+                  web_state.bg_r, web_state.bg_g, web_state.bg_b);
+}
+
 // Parse ANSI SGR (Select Graphic Rendition) parameters and update state
 static void parse_ansi_sgr(const char *params, size_t len) {
     // Parse semicolon-separated numbers
-    int nums[16];
-    int num_count = 0;
-    int current = 0;
+    int32_t nums[16];
+    int32_t num_count = 0;
+    int32_t current = 0;
     bool has_current = false;
 
     for (size_t i = 0; i <= len && num_count < 16; i++) {
@@ -681,8 +688,8 @@ static void parse_ansi_sgr(const char *params, size_t len) {
     }
 
     // Process SGR codes
-    for (int i = 0; i < num_count; i++) {
-        int code = nums[i];
+    for (int32_t i = 0; i < num_count; i++) {
+        int32_t code = nums[i];
         switch (code) {
             case 0:  // Reset
                 web_state.bold = false;
@@ -728,7 +735,7 @@ static void parse_ansi_sgr(const char *params, size_t len) {
             case 38:
                 if (i + 2 < num_count && nums[i + 1] == 5) {
                     // 256-color: 38;5;n
-                    int n = nums[i + 2];
+                    int32_t n = nums[i + 2];
                     i += 2;
                     if (n < 16) {
                         // Standard colors - use the 30-37/90-97 mapping
@@ -749,7 +756,7 @@ static void parse_ansi_sgr(const char *params, size_t len) {
                         web_state.fg_b = (n % 6) * 51;
                     } else {
                         // Grayscale (232-255)
-                        int gray = (n - 232) * 10 + 8;
+                        int32_t gray = (n - 232) * 10 + 8;
                         web_state.fg_r = gray;
                         web_state.fg_g = gray;
                         web_state.fg_b = gray;
@@ -777,7 +784,7 @@ static void parse_ansi_sgr(const char *params, size_t len) {
             case 48:
                 if (i + 2 < num_count && nums[i + 1] == 5) {
                     // 256-color background
-                    int n = nums[i + 2];
+                    int32_t n = nums[i + 2];
                     i += 2;
                     if (n < 16) {
                         static const uint8_t std_colors[16][3] = {
@@ -795,7 +802,7 @@ static void parse_ansi_sgr(const char *params, size_t len) {
                         web_state.bg_g = ((n / 6) % 6) * 51;
                         web_state.bg_b = (n % 6) * 51;
                     } else {
-                        int gray = (n - 232) * 10 + 8;
+                        int32_t gray = (n - 232) * 10 + 8;
                         web_state.bg_r = gray;
                         web_state.bg_g = gray;
                         web_state.bg_b = gray;
@@ -821,7 +828,7 @@ static void web_output_text(const char *str, size_t len) {
     memcpy(buf, str, len);
     buf[len] = '\0';
 
-    int display_width = utf8_display_width(str, len);
+    int32_t display_width = utf8_display_width(str, len);
 
     js_draw_text(web_state.cursor_col, web_state.cursor_row, buf, display_width,
                  web_state.fg_r, web_state.fg_g, web_state.fg_b,
@@ -890,7 +897,7 @@ static void web_write_char(char c) {
     web_state.cursor_col++;
 }
 
-static void web_write_scaled(const char *str, size_t len, int scale) {
+static void web_write_scaled(const char *str, size_t len, int32_t scale) {
     if (scale <= 1) {
         web_write_str(str, len);
         return;
@@ -903,7 +910,7 @@ static void web_write_scaled(const char *str, size_t len, int scale) {
     buf[len] = '\0';
 
     // Calculate display width (each char takes scale cells)
-    int display_width = utf8_display_width(str, len) * scale;
+    int32_t display_width = utf8_display_width(str, len) * scale;
 
     js_draw_text_scaled(web_state.cursor_col, web_state.cursor_row, buf, scale,
                         web_state.fg_r, web_state.fg_g, web_state.fg_b,
@@ -916,7 +923,7 @@ static void web_write_scaled(const char *str, size_t len, int scale) {
     free(buf);
 }
 
-static void web_write_scaled_frac(const char *str, size_t len, int scale, int num, int denom) {
+static void web_write_scaled_frac(const char *str, size_t len, int32_t scale, int32_t num, int32_t denom) {
     // No scaling needed
     if (scale <= 1 && (num == 0 || denom == 0)) {
         web_write_str(str, len);
@@ -930,7 +937,7 @@ static void web_write_scaled_frac(const char *str, size_t len, int scale, int nu
     buf[len] = '\0';
 
     // Calculate display width (each char takes cell_scale cells)
-    int display_width = utf8_display_width(str, len) * scale;
+    int32_t display_width = utf8_display_width(str, len) * scale;
 
     // Calculate effective font scale: scale * (num / denom)
     double font_scale = (double)scale;
@@ -966,22 +973,28 @@ static void web_sync_end(void) {
     // No-op
 }
 
-static int web_read_key(void) {
+static void web_set_title(const char *title) {
+    EM_ASM({
+        document.title = UTF8ToString($0);
+    }, title);
+}
+
+static int32_t web_read_key(void) {
     
     if (web_state.key_queue_head == web_state.key_queue_tail) {
-        return PLATFORM_KEY_NONE;
+        return DAWN_KEY_NONE;
     }
 
-    int key = web_state.key_queue[web_state.key_queue_head];
+    int32_t key = web_state.key_queue[web_state.key_queue_head];
     web_state.key_queue_head = (web_state.key_queue_head + 1) % 64;
     return key;
 }
 
-static int web_get_last_mouse_col(void) {
+static int32_t web_get_last_mouse_col(void) {
     return web_state.last_mouse_col;
 }
 
-static int web_get_last_mouse_row(void) {
+static int32_t web_get_last_mouse_row(void) {
     return web_state.last_mouse_row;
 }
 
@@ -1003,7 +1016,7 @@ static bool web_input_available(float timeout_ms) {
     return web_state.key_queue_head != web_state.key_queue_tail;
 }
 
-static void web_register_signals(void (*on_resize)(int), void (*on_quit)(int)) {
+static void web_register_signals(void (*on_resize)(int32_t), void (*on_quit)(int32_t)) {
     // Not used in web - we handle events via JS callbacks
     (void)on_resize;
     (void)on_quit;
@@ -1117,11 +1130,11 @@ static bool web_write_file(const char *path, const char *data, size_t len) {
     return success;
 }
 
-static bool web_list_dir(const char *path, char ***out_names, int *out_count) {
+static bool web_list_dir(const char *path, char ***out_names, int32_t *out_count) {
     *out_names = NULL;
     *out_count = 0;
 
-    int count = EM_ASM_INT({
+    int32_t count = EM_ASM_INT({
         try {
             const path = UTF8ToString($0);
             const entries = FS.readdir(path).filter(e => e !== '.' && e !== '..');
@@ -1138,7 +1151,7 @@ static bool web_list_dir(const char *path, char ***out_names, int *out_count) {
     *out_names = malloc(count * sizeof(char*));
     if (!*out_names) return false;
 
-    for (int i = 0; i < count; i++) {
+    for (int32_t i = 0; i < count; i++) {
         (*out_names)[i] = (char*)EM_ASM_PTR({
             const name = window.dawnDirEntries[$0];
             const len = lengthBytesUTF8(name) + 1;
@@ -1195,14 +1208,14 @@ static int64_t web_time_now(void) {
     return (int64_t)js_time_now_double();
 }
 
-static void web_sleep_ms(int ms) {
+static void web_sleep_ms(int32_t ms) {
     // Can't really block in web - this is a no-op
     // Use emscripten_sleep for async version
     (void)ms;
 }
 
-static void web_get_local_time(PlatformLocalTime *out) {
-    int year, mon, mday, hour, min, sec, wday;
+static void web_get_local_time(DawnTime *out) {
+    int32_t year, mon, mday, hour, min, sec, wday;
     js_get_local_time(&year, &mon, &mday, &hour, &min, &sec, &wday);
     out->year = year;
     out->mon = mon;
@@ -1236,16 +1249,16 @@ static bool web_image_is_supported(const char *path) {
             strcasecmp(ext, "webp") == 0);
 }
 
-static bool web_image_get_size(const char *path, int *out_width, int *out_height) {
+static bool web_image_get_size(const char *path, int32_t *out_width, int32_t *out_height) {
     return js_get_image_size(path, out_width, out_height);
 }
 
-static int web_image_display(const char *path, int row, int col, int max_cols, int max_rows) {
+static int32_t web_image_display(const char *path, int32_t row, int32_t col, int32_t max_cols, int32_t max_rows) {
     return js_display_image(path, row, col, max_cols, max_rows);
 }
 
-static int web_image_display_cropped(const char *path, int row, int col, int max_cols,
-                                      int crop_top_rows, int visible_rows) {
+static int32_t web_image_display_cropped(const char *path, int32_t row, int32_t col, int32_t max_cols,
+                                      int32_t crop_top_rows, int32_t visible_rows) {
     // Web canvas doesn't support partial image cropping
     (void)crop_top_rows;
     return js_display_image(path, row, col, max_cols, visible_rows);
@@ -1265,7 +1278,7 @@ static void web_image_clear_all(void) {
     });
 }
 
-static void web_image_mask_region(int col, int row, int cols, int rows, PlatformColor bg) {
+static void web_image_mask_region(int32_t col, int32_t row, int32_t cols, int32_t rows, DawnColor bg) {
     js_clear_rect(col, row, cols, rows, bg.r, bg.g, bg.b);
 }
 
@@ -1297,18 +1310,18 @@ static bool web_image_resolve_path(const char *raw_path, const char *base_dir,
     return true;
 }
 
-static int web_image_calc_rows(int pixel_width, int pixel_height, int max_cols, int max_rows) {
+static int32_t web_image_calc_rows(int32_t pixel_width, int32_t pixel_height, int32_t max_cols, int32_t max_rows) {
     if (pixel_width <= 0 || pixel_height <= 0) return 0;
 
-    int max_width_px = max_cols * CELL_WIDTH;
-    int max_height_px = max_rows > 0 ? max_rows * CELL_HEIGHT : pixel_height;
+    int32_t max_width_px = max_cols * CELL_WIDTH;
+    int32_t max_height_px = max_rows > 0 ? max_rows * CELL_HEIGHT : pixel_height;
 
     float scale = 1.0f;
     if (pixel_width > max_width_px) {
         scale = (float)max_width_px / pixel_width;
     }
 
-    int scaled_height = (int)(pixel_height * scale);
+    int32_t scaled_height = (int32_t)(pixel_height * scale);
     if (max_rows > 0 && scaled_height > max_height_px) {
         scaled_height = max_height_px;
     }
@@ -1326,13 +1339,14 @@ static void web_image_invalidate(const char *path) {
 }
 
 
-const PlatformBackend platform_web = {
+const DawnBackend dawn_backend_web = {
     .name = "web",
 
     // Lifecycle
     .init = web_init,
     .shutdown = web_shutdown,
-    .get_capabilities = web_get_capabilities,
+    .get_caps = web_get_capabilities,
+    .get_host_bg = NULL,
 
     // Display
     .get_size = web_get_size,
@@ -1344,12 +1358,13 @@ const PlatformBackend platform_web = {
     .set_bold = web_set_bold,
     .set_italic = web_set_italic,
     .set_dim = web_set_dim,
-    .set_strikethrough = web_set_strikethrough,
+    .set_strike = web_set_strikethrough,
     .set_underline = web_set_underline,
     .set_underline_color = web_set_underline_color,
     .clear_underline = web_clear_underline,
     .clear_screen = web_clear_screen,
     .clear_line = web_clear_line,
+    .clear_range = web_clear_range,
     .write_str = web_write_str,
     .write_char = web_write_char,
     .write_scaled = web_write_scaled,
@@ -1357,67 +1372,51 @@ const PlatformBackend platform_web = {
     .flush = web_flush,
     .sync_begin = web_sync_begin,
     .sync_end = web_sync_end,
+    .set_title = web_set_title,
 
     // Input
     .read_key = web_read_key,
-    .get_last_mouse_col = web_get_last_mouse_col,
-    .get_last_mouse_row = web_get_last_mouse_row,
+    .mouse_col = web_get_last_mouse_col,
+    .mouse_row = web_get_last_mouse_row,
     .check_resize = web_check_resize,
     .check_quit = web_check_quit,
-    .input_available = web_input_available,
+    .poll_jobs = NULL,
+    .input_ready = web_input_available,
     .register_signals = web_register_signals,
 
     // Clipboard
-    .clipboard_copy = web_clipboard_copy,
-    .clipboard_paste = web_clipboard_paste,
+    .copy = web_clipboard_copy,
+    .paste = web_clipboard_paste,
 
     // Filesystem
-    .get_home_dir = web_get_home_dir,
+    .home_dir = web_get_home_dir,
     .mkdir_p = web_mkdir_p,
     .file_exists = web_file_exists,
     .read_file = web_read_file,
     .write_file = web_write_file,
     .list_dir = web_list_dir,
-    .get_mtime = web_get_mtime,
-    .delete_file = web_delete_file,
-    .reveal_in_finder = web_reveal_in_finder,
+    .mtime = web_get_mtime,
+    .rm = web_delete_file,
+    .reveal = web_reveal_in_finder,
 
     // Time
-    .time_now = web_time_now,
+    .now = web_time_now,
     .sleep_ms = web_sleep_ms,
-    .get_local_time = web_get_local_time,
-    .get_username = web_get_username,
+    .localtime = web_get_local_time,
+    .username = web_get_username,
 
     // Images
-    .image_is_supported = web_image_is_supported,
-    .image_get_size = web_image_get_size,
-    .image_display = web_image_display,
-    .image_display_cropped = web_image_display_cropped,
-    .image_frame_start = web_image_frame_start,
-    .image_frame_end = web_image_frame_end,
-    .image_clear_all = web_image_clear_all,
-    .image_mask_region = web_image_mask_region,
-    .image_resolve_path = web_image_resolve_path,
-    .image_calc_rows = web_image_calc_rows,
-    .image_invalidate = web_image_invalidate,
+    .img_supported = web_image_is_supported,
+    .img_size = web_image_get_size,
+    .img_display = web_image_display,
+    .img_display_cropped = web_image_display_cropped,
+    .img_frame_start = web_image_frame_start,
+    .img_frame_end = web_image_frame_end,
+    .img_clear_all = web_image_clear_all,
+    .img_mask = web_image_mask_region,
+    .img_resolve = web_image_resolve_path,
+    .img_calc_rows = web_image_calc_rows,
+    .img_invalidate = web_image_invalidate,
 };
-
-
-// Global platform backend pointer (defined in platform.h as extern)
-const PlatformBackend *_platform_current = NULL;
-
-bool platform_init(const PlatformBackend *backend) {
-    if (!backend) return false;
-    if (!backend->init()) return false;
-    _platform_current = backend;
-    return true;
-}
-
-void platform_shutdown(void) {
-    if (_platform_current && _platform_current->shutdown) {
-        _platform_current->shutdown();
-    }
-    _platform_current = NULL;
-}
 
 #endif // __EMSCRIPTEN__

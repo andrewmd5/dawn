@@ -14,14 +14,14 @@ void render_clear(void);
 //! @param row display row (1-based)
 //! @param text text to display
 //! @param fg foreground color
-void render_center_text(int row, const char *text, Color fg);
+void render_center_text(int32_t row, const char *text, DawnColor fg);
 
 //! Render a floating popup box centered on screen
 //! @param width box width in columns
 //! @param height box height in rows
 //! @param out_top output: top-left row (1-based)
 //! @param out_left output: top-left column (1-based)
-void render_popup_box(int width, int height, int *out_top, int *out_left);
+void render_popup_box(int32_t width, int32_t height, int32_t *out_top, int32_t *out_left);
 
 // #endregion
 
@@ -48,8 +48,8 @@ void render_finished(void);
 //! Render the title editing screen
 void render_title_edit(void);
 
-//! Render the image dimension editing screen
-void render_image_edit(void);
+//! Render the block editing screen (images, etc.)
+void render_block_edit(void);
 
 //! Render the table of contents overlay
 void render_toc(void);

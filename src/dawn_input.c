@@ -4,28 +4,16 @@
 
 // #region Input Reading
 
-int input_read_key(void) {
-    const PlatformBackend *p = platform_get();
-    if (p && p->read_key) {
-        return p->read_key();
-    }
-    return KEY_NONE;
+int32_t input_read_key(void) {
+    return DAWN_BACKEND(app)->read_key();
 }
 
-int input_last_mouse_col(void) {
-    const PlatformBackend *p = platform_get();
-    if (p && p->get_last_mouse_col) {
-        return p->get_last_mouse_col();
-    }
-    return 0;
+int32_t input_last_mouse_col(void) {
+    return DAWN_BACKEND(app)->mouse_col();
 }
 
-int input_last_mouse_row(void) {
-    const PlatformBackend *p = platform_get();
-    if (p && p->get_last_mouse_row) {
-        return p->get_last_mouse_row();
-    }
-    return 0;
+int32_t input_last_mouse_row(void) {
+    return DAWN_BACKEND(app)->mouse_row();
 }
 
 // #endregion

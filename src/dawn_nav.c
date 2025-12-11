@@ -19,18 +19,18 @@ size_t nav_line_end(size_t pos) {
     return pos;
 }
 
-size_t nav_move_line(size_t pos, int delta) {
+size_t nav_move_line(size_t pos, int32_t delta) {
     size_t col = pos - nav_line_start(pos);
 
     if (delta < 0) {
-        for (int i = 0; i < -delta && pos > 0; i++) {
+        for (int32_t i = 0; i < -delta && pos > 0; i++) {
             pos = nav_line_start(pos);
             if (pos > 0) pos--;
             pos = nav_line_start(pos);
         }
     } else {
         size_t len = gap_len(&app.text);
-        for (int i = 0; i < delta && pos < len; i++) {
+        for (int32_t i = 0; i < delta && pos < len; i++) {
             pos = nav_line_end(pos);
             if (pos < len) pos++;
         }
@@ -54,7 +54,7 @@ static size_t skip_leading_space_nav(size_t pos, size_t end) {
     return pos;
 }
 
-size_t nav_move_visual_line(size_t pos, int delta, int text_width) {
+size_t nav_move_visual_line(size_t pos, int32_t delta, int32_t text_width) {
     if (text_width <= 0) return pos;
 
     size_t len = gap_len(&app.text);
@@ -65,11 +65,11 @@ size_t nav_move_visual_line(size_t pos, int delta, int text_width) {
 
     size_t seg_start = line_start;
     size_t seg_end = line_end;
-    int seg_num = 0;
-    int col_in_seg = 0;
+    int32_t seg_num = 0;
+    int32_t col_in_seg = 0;
 
     while (seg_start < line_end) {
-        int seg_width;
+        int32_t seg_width;
         seg_end = gap_find_wrap_point(&app.text, seg_start, line_end, text_width, &seg_width);
 
         if (pos >= seg_start && pos < seg_end) {
@@ -83,12 +83,12 @@ size_t nav_move_visual_line(size_t pos, int delta, int text_width) {
     }
 
     if (delta < 0) {
-        for (int i = 0; i < -delta; i++) {
+        for (int32_t i = 0; i < -delta; i++) {
             if (seg_num > 0) {
                 seg_start = line_start;
-                int target_seg = seg_num - 1;
-                for (int s = 0; s < target_seg && seg_start < line_end; s++) {
-                    int sw;
+                int32_t target_seg = seg_num - 1;
+                for (int32_t s = 0; s < target_seg && seg_start < line_end; s++) {
+                    int32_t sw;
                     size_t se = gap_find_wrap_point(&app.text,seg_start, line_end, text_width, &sw);
                     if (se >= line_end) break;
                     seg_start = skip_leading_space_nav(se, line_end);
@@ -101,7 +101,7 @@ size_t nav_move_visual_line(size_t pos, int delta, int text_width) {
                 seg_start = line_start;
                 seg_num = 0;
                 while (seg_start < line_end) {
-                    int sw;
+                    int32_t sw;
                     size_t se = gap_find_wrap_point(&app.text,seg_start, line_end, text_width, &sw);
                     if (se >= line_end) break;
                     seg_num++;
@@ -113,7 +113,7 @@ size_t nav_move_visual_line(size_t pos, int delta, int text_width) {
             }
         }
     } else {
-        for (int i = 0; i < delta; i++) {
+        for (int32_t i = 0; i < delta; i++) {
             size_t next_seg_start = skip_leading_space_nav(seg_end, line_end);
 
             if (next_seg_start < line_end) {
@@ -134,10 +134,10 @@ size_t nav_move_visual_line(size_t pos, int delta, int text_width) {
     }
 
     size_t result = seg_start;
-    int width = 0;
+    int32_t width = 0;
     while (result < seg_end && result < len) {
         size_t next;
-        int gw = gap_grapheme_width(&app.text, result, &next);
+        int32_t gw = gap_grapheme_width(&app.text, result, &next);
         if (width + gw > col_in_seg) break;
         width += gw;
         result = next;
@@ -180,16 +180,15 @@ static bool nav_check_block_at(size_t pos, size_t *total_len) {
         return true;
     }
 
-    size_t cb_tl;
-    if (md_check_code_block(&app.text, pos, NULL, NULL, NULL, NULL, &cb_tl)) {
-        *total_len = cb_tl;
+    MdMatch2 code_block;
+    if (md_check_code_block(&app.text, pos, &code_block)) {
+        *total_len = code_block.total_len;
         return true;
     }
 
-    size_t img_path_start, img_total;
-    if (md_check_image(&app.text, pos, NULL, NULL, &img_path_start, NULL,
-                       NULL, NULL, &img_total)) {
-        *total_len = img_total;
+    MdImageAttrs img;
+    if (md_check_image(&app.text, pos, &img)) {
+        *total_len = img.total_len;
         return true;
     }
 
@@ -223,7 +222,7 @@ size_t nav_skip_block_backward(size_t pos) {
     return pos;
 }
 
-size_t nav_move_visual_line_block_aware(size_t pos, int delta, int text_width, bool skip_blocks) {
+size_t nav_move_visual_line_block_aware(size_t pos, int32_t delta, int32_t text_width, bool skip_blocks) {
     if (!skip_blocks) {
         return nav_move_visual_line(pos, delta, text_width);
     }
@@ -248,7 +247,7 @@ size_t nav_move_visual_line_block_aware(size_t pos, int delta, int text_width, b
         }
     }
 
-    for (int i = 0; i < (delta > 0 ? delta : -delta); i++) {
+    for (int32_t i = 0; i < (delta > 0 ? delta : -delta); i++) {
         size_t new_pos = nav_move_visual_line(pos, delta > 0 ? 1 : -1, text_width);
 
         if (new_pos == pos) break;

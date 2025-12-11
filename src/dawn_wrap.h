@@ -19,7 +19,7 @@
 
 //! Configuration options for word wrapping
 typedef struct {
-    int tab_size;           //!< Number of spaces per tab (default: 4)
+    int32_t tab_size;           //!< Number of spaces per tab (default: 4)
     bool trim_whitespace;   //!< Trim leading/trailing whitespace on lines
     bool split_words;       //!< Allow splitting words with hyphen if too long
     bool keep_dash_with_word; //!< Keep dashes attached to preceding word
@@ -29,8 +29,8 @@ typedef struct {
 typedef struct {
     size_t start;           //!< Byte offset in source text
     size_t end;             //!< Byte offset end (exclusive)
-    int display_width;      //!< Display width in terminal columns
-    int segment_in_orig;    //!< Which segment this is within original line
+    int32_t display_width;      //!< Display width in terminal columns
+    int32_t segment_in_orig;    //!< Which segment this is within original line
     bool is_hard_break;     //!< True if line ended with actual newline
     bool ends_with_split;   //!< True if word was split with hyphen
 } WrapLine;
@@ -38,10 +38,10 @@ typedef struct {
 //! Result of wrapping text into lines
 typedef struct {
     WrapLine *lines;        //!< Array of wrapped lines
-    int count;              //!< Number of lines
-    int capacity;           //!< Allocated capacity
+    int32_t count;              //!< Number of lines
+    int32_t capacity;           //!< Allocated capacity
     WrapConfig config;      //!< Configuration used for wrapping
-    int limit;              //!< Width limit used
+    int32_t limit;              //!< Width limit used
 } WrapResult;
 
 // #endregion
@@ -73,7 +73,7 @@ void wrap_free(WrapResult *wr);
 //! @param width maximum display width in columns
 //! @param out wrap result structure (must be initialized)
 //! @return number of wrapped lines
-int wrap_text(const GapBuffer *gb, int width, WrapResult *out);
+int32_t wrap_text(const GapBuffer *gb, int32_t width, WrapResult *out);
 
 //! Wrap text from gap buffer with configuration options
 //! @param gb gap buffer containing text
@@ -81,7 +81,7 @@ int wrap_text(const GapBuffer *gb, int width, WrapResult *out);
 //! @param config wrapping configuration
 //! @param out wrap result structure (must be initialized)
 //! @return number of wrapped lines
-int wrap_text_config(const GapBuffer *gb, int width, WrapConfig config, WrapResult *out);
+int32_t wrap_text_config(const GapBuffer *gb, int32_t width, WrapConfig config, WrapResult *out);
 
 //! Wrap a plain string to fit given width
 //! @param text string to wrap
@@ -89,7 +89,7 @@ int wrap_text_config(const GapBuffer *gb, int width, WrapConfig config, WrapResu
 //! @param width maximum display width in columns
 //! @param out wrap result structure (must be initialized)
 //! @return number of wrapped lines
-int wrap_string(const char *text, size_t len, int width, WrapResult *out);
+int32_t wrap_string(const char *text, size_t len, int32_t width, WrapResult *out);
 
 //! Wrap a plain string with configuration options
 //! @param text string to wrap
@@ -98,7 +98,7 @@ int wrap_string(const char *text, size_t len, int width, WrapResult *out);
 //! @param config wrapping configuration
 //! @param out wrap result structure (must be initialized)
 //! @return number of wrapped lines
-int wrap_string_config(const char *text, size_t len, int width, WrapConfig config, WrapResult *out);
+int32_t wrap_string_config(const char *text, size_t len, int32_t width, WrapConfig config, WrapResult *out);
 
 // #endregion
 
@@ -108,14 +108,14 @@ int wrap_string_config(const char *text, size_t len, int width, WrapConfig confi
 //! @param text UTF-8 string
 //! @param len length in bytes
 //! @return display width in terminal columns
-int utf8_display_width(const char *text, size_t len);
+int32_t utf8_display_width(const char *text, size_t len);
 
 //! Get display width of text range in gap buffer
 //! @param gb gap buffer to measure
 //! @param start start byte position
 //! @param end end byte position
 //! @return display width in terminal columns
-int gap_display_width(const GapBuffer *gb, size_t start, size_t end);
+int32_t gap_display_width(const GapBuffer *gb, size_t start, size_t end);
 
 //! Find the best wrap point within a range of text
 //! @param gb gap buffer to search
@@ -124,7 +124,7 @@ int gap_display_width(const GapBuffer *gb, size_t start, size_t end);
 //! @param width maximum display width
 //! @param out_width output: actual width at wrap point (optional)
 //! @return byte position to wrap at (after last space/dash if possible)
-size_t gap_find_wrap_point(const GapBuffer *gb, size_t start, size_t end, int width, int *out_width);
+size_t gap_find_wrap_point(const GapBuffer *gb, size_t start, size_t end, int32_t width, int32_t *out_width);
 
 // #endregion
 
@@ -147,7 +147,7 @@ size_t gap_grapheme_prev(const GapBuffer *gb, size_t pos);
 //! @param pos byte position of grapheme
 //! @param next_pos output: position after this grapheme (optional)
 //! @return display width in terminal columns
-int gap_grapheme_width(const GapBuffer *gb, size_t pos, size_t *next_pos);
+int32_t gap_grapheme_width(const GapBuffer *gb, size_t pos, size_t *next_pos);
 
 // #endregion
 

@@ -5,6 +5,8 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
+#include "dawn_backend.h"
 
 // #region Constants
 
@@ -15,14 +17,14 @@
 #define TEX_INITIAL_ROW_CAPACITY 64
 
 //! Alignment constants
-typedef enum {
+DAWN_ENUM(uint8_t) {
     TEX_ALIGN_LEFT = 0,
     TEX_ALIGN_CENTER,
     TEX_ALIGN_RIGHT,
 } TexAlign;
 
 //! Delimiter position constants
-typedef enum {
+DAWN_ENUM(uint8_t) {
     TEX_DELIM_SGL = 0,  //! Single-line
     TEX_DELIM_TOP,      //! Top of multi-line
     TEX_DELIM_CTR,      //! Center of multi-line
@@ -34,7 +36,7 @@ typedef enum {
 
 // #region Token Types
 
-typedef enum {
+DAWN_ENUM(uint8_t) {
     TEX_TOK_NONE = 0,
     TEX_TOK_ALPH,    //! Alphabetic character
     TEX_TOK_NUMB,    //! Numeric character
@@ -46,14 +48,14 @@ typedef enum {
 typedef struct {
     TexTokenType type;
     char value[TEX_MAX_TOKEN_LEN];
-    int value_len;
+    int32_t value_len;
 } TexToken;
 
 // #endregion
 
 // #region Node Types
 
-typedef enum {
+DAWN_ENUM(uint8_t) {
     TEX_NT_NONE = 0,
 
     // Container nodes
@@ -124,9 +126,9 @@ typedef enum {
 
 //! Dynamic array of child indices
 typedef struct {
-    int *data;
-    int count;
-    int capacity;
+    int32_t *data;
+    int32_t count;
+    int32_t capacity;
 } TexIdArray;
 
 //! AST Node using flat structure with index references
@@ -140,8 +142,8 @@ typedef struct {
 //! Flat node array for the entire AST
 typedef struct {
     TexNode *nodes;
-    int count;
-    int capacity;
+    int32_t count;
+    int32_t capacity;
 } TexNodeArray;
 
 // #endregion
@@ -156,23 +158,23 @@ typedef struct {
 //! Row of cells
 typedef struct {
     TexCell *cells;
-    int count;
-    int capacity;
+    int32_t count;
+    int32_t capacity;
 } TexRow;
 
 //! 2D Unicode art with baseline tracking
 typedef struct {
     TexRow *rows;     //! Array of rows
-    int height;       //! Number of rows
-    int width;        //! Width (cells per row)
-    int horizon;      //! Baseline row index (for alignment)
+    int32_t height;       //! Number of rows
+    int32_t width;        //! Width (cells per row)
+    int32_t horizon;      //! Baseline row index (for alignment)
 } TexSketch;
 
 // #endregion
 
 // #region Font Options
 
-typedef enum {
+DAWN_ENUM(uint8_t) {
     TEX_FONT_NORMAL = 0,
     TEX_FONT_SERIF_IT,
     TEX_FONT_SERIF_BLD,
@@ -209,7 +211,7 @@ TexSketch *tex_render_inline(const char *latex, size_t len, bool use_serif_itali
 void tex_sketch_free(TexSketch *s);
 
 //! Create an empty sketch with given dimensions
-TexSketch *tex_sketch_new(int height, int width);
+TexSketch *tex_sketch_new(int32_t height, int32_t width);
 
 //! Print sketch to stdout (for debugging)
 void tex_sketch_print(const TexSketch *s);
@@ -242,13 +244,13 @@ TexNodeType tex_get_parent_dep_type(TexNodeType parent, TexTokenType tok_type, c
 //! @param len Length of input
 //! @param out_count Output: number of tokens
 //! @return Array of tokens (caller must free)
-TexToken *tex_lex(const char *input, size_t len, int *out_count);
+TexToken *tex_lex(const char *input, size_t len, int32_t *out_count);
 
 //! Parse tokens into flat node array
 //! @param tokens Token array from tex_lex
 //! @param count Number of tokens
 //! @return Node array (caller must free with tex_nodes_free)
-TexNodeArray *tex_parse(TexToken *tokens, int count);
+TexNodeArray *tex_parse(TexToken *tokens, int32_t count);
 
 //! Render node array to sketch
 //! @param nodes Node array from tex_parse

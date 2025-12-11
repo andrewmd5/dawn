@@ -192,7 +192,7 @@ static const HtmlEntity entity_table[] = {
     {"icy", "\xd0\xb8"},
     {"iff", "\xe2\x87\x94"},
     {"ifr", "\xf0\x9d\x94\xa6"},
-    {"int", "\xe2\x88\xab"},
+    {"int32_t", "\xe2\x88\xab"},
     {"jcy", "\xd0\xb9"},
     {"jfr", "\xf0\x9d\x94\xa7"},
     {"kcy", "\xd0\xba"},
@@ -2153,7 +2153,7 @@ static inline const char* entity_lookup(const char *name, size_t name_len) {
         const char *entry_name = entity_table[mid].name;
         size_t entry_len = strlen(entry_name);
 
-        int cmp;
+        int32_t cmp;
         if (name_len != entry_len) {
             cmp = (name_len < entry_len) ? -1 : 1;
         } else {
@@ -2171,12 +2171,12 @@ static inline const char* entity_lookup(const char *name, size_t name_len) {
 // Input: str points after "&#", e.g., "123;" or "x1F;"
 // Returns UTF-8 length written to out, and sets *consumed to chars consumed
 // Returns 0 if invalid
-static inline int entity_decode_numeric(const char *str, size_t len, char *out, size_t *consumed) {
+static inline int32_t entity_decode_numeric(const char *str, size_t len, char *out, size_t *consumed) {
     if (len == 0) return 0;
 
     uint32_t codepoint = 0;
     size_t i = 0;
-    int is_hex = 0;
+    int32_t is_hex = 0;
 
     // Check for hex prefix
     if (str[0] == 'x' || str[0] == 'X') {
@@ -2231,7 +2231,7 @@ static inline int entity_decode_numeric(const char *str, size_t len, char *out, 
 
     // Use utf8proc to encode codepoint to UTF-8
     utf8proc_ssize_t bytes = utf8proc_encode_char((utf8proc_int32_t)codepoint, (utf8proc_uint8_t *)out);
-    return (int)(bytes > 0 ? bytes : 0);
+    return (int32_t)(bytes > 0 ? bytes : 0);
 }
 
 #endif // HTML_ENTITIES_H

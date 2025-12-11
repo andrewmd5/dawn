@@ -5,10 +5,10 @@
 #include "dawn_args.h"
 #include "dawn_types.h"
 
-#include <getopt.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <libgen.h>
 #include <time.h>
 #include <unistd.h>
 #include <sys/select.h>
@@ -16,18 +16,15 @@
 
 // #region Option Definitions
 
-static const char *short_opts = "f:d:t:p:rhv";
-
-static struct option long_opts[] = {
-    {"file",    required_argument, NULL, 'f'},
-    {"demo",    required_argument, NULL, 'd'},
-    {"theme",   required_argument, NULL, 't'},
-    {"preview", required_argument, NULL, 'p'},
-    {"render",  no_argument,       NULL, 'r'},
-    {"help",    no_argument,       NULL, 'h'},
-    {"version", no_argument,       NULL, 'v'},
-    {NULL,      0,                 NULL,  0 }
-};
+// POSIX options: single-character only
+// -f FILE   Open file for editing
+// -d FILE   Demo mode
+// -t THEME  Set theme (light/dark)
+// -p FILE   Preview file (read-only)
+// -P        Print mode (render to stdout)
+// -h        Help
+// -v        Version
+static const char *short_opts = "f:d:t:p:Phv";
 
 // #endregion
 
@@ -74,7 +71,7 @@ static char *resolve_path(const char *path) {
 //! Parse theme argument
 //! @param arg theme string ("light" or "dark")
 //! @return 0 for light, 1 for dark, -1 for invalid
-static int parse_theme(const char *arg) {
+static int32_t parse_theme(const char *arg) {
     if (!arg) return -1;
     if (strcasecmp(arg, "light") == 0 || strcmp(arg, "0") == 0) return 0;
     if (strcasecmp(arg, "dark") == 0 || strcmp(arg, "1") == 0) return 1;
@@ -85,7 +82,7 @@ static int parse_theme(const char *arg) {
 
 // #region Public Functions
 
-DawnArgs args_parse(int argc, char *argv[]) {
+DawnArgs args_parse(int32_t argc, char *argv[]) {
     DawnArgs args = {0};
     args.theme = -1;  // Not set
 
@@ -93,81 +90,109 @@ DawnArgs args_parse(int argc, char *argv[]) {
     optind = 1;
     opterr = 0;
 
-    int opt;
-    while ((opt = getopt_long(argc, argv, short_opts, long_opts, NULL)) != -1) {
+    int32_t opt;
+    while ((opt = getopt(argc, argv, short_opts)) != -1) {
         switch (opt) {
             case 'f':
                 args.file = resolve_path(optarg);
                 break;
 
             case 'd':
-                args.demo_mode = true;
+                args.flags |= ARG_DEMO;
                 args.demo_file = resolve_path(optarg);
                 break;
 
             case 't':
                 args.theme = parse_theme(optarg);
                 if (args.theme < 0) {
-                    args.error = true;
+                    args.flags |= ARG_ERROR;
                     args.error_msg = "Invalid theme (use 'light' or 'dark')";
                 }
                 break;
 
             case 'p':
-                args.preview_mode = true;
+                args.flags |= ARG_PREVIEW;
                 args.file = resolve_path(optarg);
                 break;
 
-            case 'r':
-                args.render_mode = true;
+            case 'P':
+                args.flags |= ARG_PRINT;
                 break;
 
             case 'h':
-                args.show_help = true;
+                args.flags |= ARG_HELP;
                 break;
 
             case 'v':
-                args.show_version = true;
+                args.flags |= ARG_VERSION;
                 break;
 
             case '?':
-                args.error = true;
+                args.flags |= ARG_ERROR;
                 args.error_msg = "Unknown option";
                 break;
 
             case ':':
-                args.error = true;
+                args.flags |= ARG_ERROR;
                 args.error_msg = "Missing argument";
                 break;
         }
     }
 
-    // Check for positional argument (file path without -f)
-    if (optind < argc && !args.file && !args.demo_file) {
-        args.file = resolve_path(argv[optind]);
+    // Process operands (after options, or after --)
+    while (optind < argc) {
+        const char *operand = argv[optind++];
+
+        // "-" means stdin
+        if (strcmp(operand, "-") == 0) {
+            args.flags |= ARG_STDIN;
+            continue;
+        }
+
+        // File operand (if no file set yet)
+        if (!args.file && !args.demo_file) {
+            args.file = resolve_path(operand);
+        }
     }
 
-    // Check for stdin data if render mode or if stdin is a pipe
-    if (!args.file && !args.demo_mode && !args.show_help && !args.show_version) {
+    // If print mode with stdin flag or piped input, use stdin
+    if (args.flags & ARG_PRINT) {
+        if (!(args.flags & ARG_STDIN) && !args.file && args_stdin_has_data()) {
+            args.flags |= ARG_STDIN;
+        }
+    }
+
+    // Auto-detect piped input when no file and no explicit mode
+    if (!args.file && !(args.flags & (ARG_DEMO | ARG_HELP | ARG_VERSION | ARG_STDIN))) {
         if (args_stdin_has_data()) {
-            args.render_mode = true;
+            args.flags |= ARG_STDIN | ARG_PRINT;
         }
     }
 
     // Validate combinations
-    if (args.demo_mode && args.preview_mode) {
-        args.error = true;
-        args.error_msg = "Cannot use --demo and --preview together";
+    if ((args.flags & ARG_DEMO) && (args.flags & ARG_PREVIEW)) {
+        args.flags |= ARG_ERROR;
+        args.error_msg = "Cannot use -d and -p together";
     }
 
-    if (args.render_mode && (args.file || args.demo_mode || args.preview_mode)) {
-        args.error = true;
-        args.error_msg = "Cannot use --render with --file, --demo, or --preview";
+    if ((args.flags & ARG_STDIN) && args.file) {
+        args.flags |= ARG_ERROR;
+        args.error_msg = "Cannot use - with a file argument";
     }
 
-    if (args.preview_mode && !args.file) {
-        args.error = true;
-        args.error_msg = "--preview requires a file path";
+    if ((args.flags & ARG_PREVIEW) && !args.file) {
+        args.flags |= ARG_ERROR;
+        args.error_msg = "-p requires a file path";
+    }
+
+    if ((args.flags & ARG_PRINT) && !args.file && !(args.flags & ARG_STDIN)) {
+        args.flags |= ARG_ERROR;
+        args.error_msg = "-P requires a file or stdin input";
+    }
+
+    if ((args.flags & ARG_PRINT) && (args.flags & (ARG_PREVIEW | ARG_DEMO))) {
+        args.flags |= ARG_ERROR;
+        args.error_msg = "Cannot use -P with -p or -d";
     }
 
     return args;
@@ -244,32 +269,38 @@ bool args_copy_to_dawn(const char *src_path, char *out_path, size_t out_size) {
 
 void args_print_usage(const char *program_name) {
     fprintf(stderr,
-        "Usage: %s [OPTIONS] [FILE]\n"
+        "Usage: %s [options] [file | -]\n"
         "\n"
         "Dawn: Draft Anything, Write Now\n"
         "A distraction-free writing environment with live markdown rendering\n"
         "\n"
         "Options:\n"
-        "  -f, --file FILE     Open FILE (copies to ~/.dawn for editing)\n"
-        "  -p, --preview FILE  Preview FILE in read-only mode\n"
-        "  -d, --demo FILE     Demo mode: replay FILE as if being typed\n"
-        "  -t, --theme THEME   Set theme: 'light' or 'dark'\n"
-        "  -r, --render        Render stdin to stdout and exit\n"
-        "  -h, --help          Show this help message\n"
-        "  -v, --version       Show version information\n"
+        "  -f file     Open file (copies to ~/.dawn for editing)\n"
+        "  -p file     Preview file in read-only mode\n"
+        "  -P          Print rendered output to stdout and exit\n"
+        "  -d file     Demo mode: replay file as if being typed\n"
+        "  -t theme    Set theme: 'light' or 'dark'\n"
+        "  -h          Show this help message\n"
+        "  -v          Show version information\n"
         "\n"
-        "Arguments:\n"
-        "  FILE                Path to markdown file (same as --file FILE)\n"
+        "Operands:\n"
+        "  file        Path to markdown file (same as -f file)\n"
+        "  -           Read from standard input\n"
+        "\n"
+        "The -- argument terminates option processing.\n"
         "\n"
         "Examples:\n"
         "  %s                       Start with welcome screen\n"
         "  %s notes.md              Open notes.md (copied to ~/.dawn)\n"
         "  %s -p README.md          Preview README.md (read-only)\n"
+        "  %s -P doc.md             Print rendered doc.md to stdout\n"
+        "  cat doc.md | %s -P       Render piped markdown to stdout\n"
+        "  %s -P -                  Read from stdin, print to stdout\n"
         "  %s -t light              Start with light theme\n"
         "  %s -d demo.md -t dark    Demo with dark theme\n"
-        "  cat doc.md | %s -r       Render markdown to terminal\n"
         "\n",
-        program_name, program_name, program_name, program_name, program_name, program_name, program_name);
+        program_name, program_name, program_name, program_name,
+        program_name, program_name, program_name, program_name, program_name);
 }
 
 void args_print_version(void) {
@@ -291,6 +322,40 @@ bool args_stdin_has_data(void) {
     FD_SET(STDIN_FILENO, &fds);
 
     return select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) > 0;
+}
+
+char *args_read_stdin(size_t *out_size) {
+    if (!out_size) return NULL;
+    *out_size = 0;
+
+    // Initial buffer
+    size_t capacity = 4096;
+    size_t size = 0;
+    char *buf = malloc(capacity);
+    if (!buf) return NULL;
+
+    // Read all of stdin
+    char chunk[4096];
+    size_t n;
+    while ((n = fread(chunk, 1, sizeof(chunk), stdin)) > 0) {
+        // Grow buffer if needed
+        if (size + n + 1 > capacity) {
+            capacity = (size + n + 1) * 2;
+            char *newbuf = realloc(buf, capacity);
+            if (!newbuf) {
+                free(buf);
+                return NULL;
+            }
+            buf = newbuf;
+        }
+        memcpy(buf + size, chunk, n);
+        size += n;
+    }
+
+    // Null-terminate
+    buf[size] = '\0';
+    *out_size = size;
+    return buf;
 }
 
 // #endregion

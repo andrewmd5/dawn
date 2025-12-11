@@ -125,7 +125,7 @@ static const ScriptPair SCRIPT_CHARS[] = {
 //! @return Superscript string or NULL if not available
 const char *tex_to_superscript(const char *c) {
     if (!c) return NULL;
-    for (int i = 0; SCRIPT_CHARS[i].normal != NULL; i++) {
+    for (int32_t i = 0; SCRIPT_CHARS[i].normal != NULL; i++) {
         if (strcmp(SCRIPT_CHARS[i].normal, c) == 0) {
             if (SCRIPT_CHARS[i].super[0] != ' ' || c[0] == ' ') {
                 return SCRIPT_CHARS[i].super;
@@ -140,7 +140,7 @@ const char *tex_to_superscript(const char *c) {
 //! @return Subscript string or NULL if not available
 const char *tex_to_subscript(const char *c) {
     if (!c) return NULL;
-    for (int i = 0; SCRIPT_CHARS[i].normal != NULL; i++) {
+    for (int32_t i = 0; SCRIPT_CHARS[i].normal != NULL; i++) {
         if (strcmp(SCRIPT_CHARS[i].normal, c) == 0) {
             if (SCRIPT_CHARS[i].sub[0] != ' ' || c[0] == ' ') {
                 return SCRIPT_CHARS[i].sub;
@@ -155,7 +155,7 @@ const char *tex_to_subscript(const char *c) {
 //! @return Normal character string or NULL if not found
 const char *tex_unshrink_char(const char *c) {
     if (!c) return NULL;
-    for (int i = 0; SCRIPT_CHARS[i].normal != NULL; i++) {
+    for (int32_t i = 0; SCRIPT_CHARS[i].normal != NULL; i++) {
         if (strcmp(SCRIPT_CHARS[i].super, c) == 0 ||
             strcmp(SCRIPT_CHARS[i].sub, c) == 0) {
             return SCRIPT_CHARS[i].normal;
@@ -287,7 +287,7 @@ static const TexSymbol TEX_SYMBOLS[] = {
 
     // Large operators (single-char forms)
     { "sum", "∑" }, { "prod", "∏" }, { "coprod", "∐" },
-    { "int", "∫" }, { "oint", "∮" }, { "smallint", "∫" },
+    { "int32_t", "∫" }, { "oint", "∮" }, { "smallint", "∫" },
 
     // Dots
     { "cdots", "⋯" }, { "dots", "…" }, { "ldots", "…" },
@@ -317,7 +317,7 @@ static const TexSymbol TEX_SYMBOLS[] = {
 //! Look up a command symbol
 //! @return Symbol string or NULL if not found
 const char *tex_lookup_symbol(const char *name) {
-    for (int i = 0; TEX_SYMBOLS[i].name != NULL; i++) {
+    for (int32_t i = 0; TEX_SYMBOLS[i].name != NULL; i++) {
         if (strcmp(TEX_SYMBOLS[i].name, name) == 0) {
             return TEX_SYMBOLS[i].symbol;
         }
@@ -334,15 +334,15 @@ const char *tex_lookup_symbol(const char *name) {
 typedef struct {
     const char *name;
     const char *art;      //! Concatenated row data
-    int height;
-    int width;
-    int horizon;
+    int32_t height;
+    int32_t width;
+    int32_t horizon;
 } TexMultilineOp;
 
 static const TexMultilineOp TEX_MULTILINE_OPS[] = {
     { "sum",   "┰─╴▐╸ ┸─╴", 3, 3, 1 },
     { "prod",  "┰─┰┃ ┃┸ ┸", 3, 3, 1 },
-    { "int",   "⌠│⌡", 3, 1, 1 },
+    { "int32_t",   "⌠│⌡", 3, 1, 1 },
     { "iint",  "⌠⌠││⌡⌡", 3, 2, 1 },
     { "iiint", "⌠⌠⌠│││⌡⌡⌡", 3, 3, 1 },
     { "idotsint", "⌠ ⌠│⋯│⌡ ⌡", 3, 3, 1 },
@@ -354,8 +354,8 @@ static const TexMultilineOp TEX_MULTILINE_OPS[] = {
 
 //! Get multi-line operator art
 //! @return Concatenated row string or NULL if not found
-const char *tex_get_multiline_op(const char *name, int *out_height, int *out_width, int *out_horizon) {
-    for (int i = 0; TEX_MULTILINE_OPS[i].name != NULL; i++) {
+const char *tex_get_multiline_op(const char *name, int32_t *out_height, int32_t *out_width, int32_t *out_horizon) {
+    for (int32_t i = 0; TEX_MULTILINE_OPS[i].name != NULL; i++) {
         if (strcmp(TEX_MULTILINE_OPS[i].name, name) == 0) {
             *out_height = TEX_MULTILINE_OPS[i].height;
             *out_width = TEX_MULTILINE_OPS[i].width;
@@ -379,11 +379,11 @@ static const char *DELIMITER_FIL = "⎜⎟⎪⎪⎢⎥⎢⎥⎢⎥⎟⎜║║";
 static const char *DELIMITER_BTM = "⎝⎠⎩⎭⎣⎦⎣⎦⎢⎥⎟⎜║║";
 
 //! Find character index in delimiter string
-static int find_delim_index(char c) {
+static int32_t find_delim_index(char c) {
     const char *p = DELIMITER_SGL;
-    int idx = 0;
+    int32_t idx = 0;
     while (*p) {
-        int len = utf8proc_utf8class[(uint8_t)*p];
+        int32_t len = utf8proc_utf8class[(uint8_t)*p];
         if (len < 1) len = 1;
 
         // Compare single byte for ASCII
@@ -397,18 +397,18 @@ static int find_delim_index(char c) {
 }
 
 //! Get UTF-8 char at index
-static const char *get_utf8_at_index(const char *s, int idx) {
+static const char *get_utf8_at_index(const char *s, int32_t idx) {
     static char buf[8];
     const uint8_t *p = (const uint8_t *)s;
-    int i = 0;
+    int32_t i = 0;
     while (*p && i < idx) {
-        int len = utf8proc_utf8class[*p];
+        int32_t len = utf8proc_utf8class[*p];
         if (len < 1) len = 1;
         p += len;
         i++;
     }
     if (!*p) return NULL;
-    int len = utf8proc_utf8class[*p];
+    int32_t len = utf8proc_utf8class[*p];
     if (len < 1) len = 1;
     memcpy(buf, p, len);
     buf[len] = '\0';
@@ -419,7 +419,7 @@ static const char *get_utf8_at_index(const char *s, int idx) {
 //! @param delim Single delimiter character
 //! @param position TexDelimPos enum value
 const char *tex_get_delimiter_char(char delim, TexDelimPos position) {
-    int idx = find_delim_index(delim);
+    int32_t idx = find_delim_index(delim);
     if (idx < 0) return NULL;
 
     const char *lookup = NULL;
@@ -462,7 +462,7 @@ static const TexAccent TEX_ACCENTS[] = {
 
 //! Get accent combining character
 const char *tex_get_accent(const char *name) {
-    for (int i = 0; TEX_ACCENTS[i].name != NULL; i++) {
+    for (int32_t i = 0; TEX_ACCENTS[i].name != NULL; i++) {
         if (strcmp(TEX_ACCENTS[i].name, name) == 0) {
             return TEX_ACCENTS[i].combining;
         }
@@ -484,10 +484,10 @@ static char search_alphabet(const char *alphabet, const char *ch) {
     if (target_len == 0) return 0;
 
     size_t pos = 0;
-    int index = 0;
+    int32_t index = 0;
 
     while (pos < alpha_len) {
-        int len = utf8proc_utf8class[alpha[pos]];
+        int32_t len = utf8proc_utf8class[alpha[pos]];
         if (len < 1) len = 1;
 
         if ((size_t)len == target_len && memcmp(alpha + pos, target, len) == 0) {
@@ -555,7 +555,7 @@ static const TexFontCmd TEX_FONT_CMDS[] = {
 
 //! Get font style for a command
 TexFontStyle tex_get_font_style(const char *name) {
-    for (int i = 0; TEX_FONT_CMDS[i].name != NULL; i++) {
+    for (int32_t i = 0; TEX_FONT_CMDS[i].name != NULL; i++) {
         if (strcmp(TEX_FONT_CMDS[i].name, name) == 0) {
             return TEX_FONT_CMDS[i].style;
         }
@@ -634,7 +634,7 @@ static const TexCmdType CMD_TYPES[] = {
     { "sum", TEX_NT_CTR_BASE },
     { "prod", TEX_NT_CTR_BASE },
     { "coprod", TEX_NT_CTR_BASE },
-    { "int", TEX_NT_CTR_BASE },
+    { "int32_t", TEX_NT_CTR_BASE },
     { "iint", TEX_NT_CTR_BASE },
     { "iiint", TEX_NT_CTR_BASE },
     { "oint", TEX_NT_CTR_BASE },
@@ -665,21 +665,21 @@ TexNodeType tex_lookup_cmd_type(const char *cmd) {
     if (!cmd) return TEX_NT_NONE;
 
     // Check font commands first
-    for (int i = 0; TEX_FONT_CMDS[i].name != NULL; i++) {
+    for (int32_t i = 0; TEX_FONT_CMDS[i].name != NULL; i++) {
         if (strcmp(TEX_FONT_CMDS[i].name, cmd) == 0) {
             return TEX_NT_CMD_FONT;
         }
     }
 
     // Check accent commands
-    for (int i = 0; TEX_ACCENTS[i].name != NULL; i++) {
+    for (int32_t i = 0; TEX_ACCENTS[i].name != NULL; i++) {
         if (strcmp(TEX_ACCENTS[i].name, cmd) == 0) {
             return TEX_NT_CMD_ACNT;
         }
     }
 
     // Check command type table
-    for (int i = 0; CMD_TYPES[i].cmd != NULL; i++) {
+    for (int32_t i = 0; CMD_TYPES[i].cmd != NULL; i++) {
         if (strcmp(CMD_TYPES[i].cmd, cmd) == 0) {
             return CMD_TYPES[i].type;
         }
@@ -740,7 +740,7 @@ static const TexParentDepType PARENT_DEP_TYPES[] = {
 TexNodeType tex_get_parent_dep_type(TexNodeType parent, TexTokenType tok_type, const char *value) {
     if (!value) return TEX_NT_NONE;
 
-    for (int i = 0; PARENT_DEP_TYPES[i].value != NULL; i++) {
+    for (int32_t i = 0; PARENT_DEP_TYPES[i].value != NULL; i++) {
         if (PARENT_DEP_TYPES[i].parent == parent &&
             PARENT_DEP_TYPES[i].tok_type == tok_type &&
             strcmp(PARENT_DEP_TYPES[i].value, value) == 0) {

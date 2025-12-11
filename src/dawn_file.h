@@ -36,6 +36,11 @@ void load_chat_history(const char *session_path);
 //! @param path path to the .md file to open
 void load_file_for_editing(const char *path);
 
+//! Load content from buffer for editing, parsing frontmatter
+//! @param content buffer containing markdown content
+//! @param size size of content buffer
+void load_buffer_for_editing(const char *content, size_t size);
+
 //! Reveal a file in system file manager
 //! @param path path to the file to reveal
 void open_in_finder(const char *path);

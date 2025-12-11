@@ -83,7 +83,7 @@ const char *hl_token_name(hl_token_t token) {
 
 hl_token_t hl_token_from_name(const char *name) {
     if (!name) return HL_TOKEN_NONE;
-    for (int i = 0; i < HL_TOKEN_COUNT; i++) {
+    for (int32_t i = 0; i < HL_TOKEN_COUNT; i++) {
         if (strcmp(token_names[i], name) == 0) {
             return (hl_token_t)i;
         }
@@ -96,7 +96,7 @@ static compiled_pattern_t compile_pattern(const char *pattern, uint32_t flags, h
 
     if (!pattern) return result;
 
-    int errorcode;
+    int32_t errorcode;
     PCRE2_SIZE erroroffset;
 
     uint32_t options = PCRE2_UTF;
@@ -189,7 +189,7 @@ void hl_ctx_free(hl_ctx_t *ctx) {
     free(ctx);
 }
 
-int hl_ctx_register_lang(hl_ctx_t *ctx, const hl_lang_def_t *lang) {
+int32_t hl_ctx_register_lang(hl_ctx_t *ctx, const hl_lang_def_t *lang) {
     if (!ctx || !lang) return -1;
 
     for (lang_entry_t *e = ctx->languages; e; e = e->next) {
@@ -307,7 +307,7 @@ static void tokenize_internal(tokenize_state_t *state,
                 continue;
             }
 
-            int rc = pcre2_match(
+            int32_t rc = pcre2_match(
                 pat->code,
                 (PCRE2_SPTR)subject,
                 subject_len,
@@ -396,7 +396,7 @@ static void tokenize_internal(tokenize_state_t *state,
     free(active);
 }
 
-int hl_tokenize(hl_ctx_t *ctx,
+int32_t hl_tokenize(hl_ctx_t *ctx,
                 const char *code, size_t code_len,
                 const char *lang_name,
                 hl_token_cb callback, void *user_data) {
@@ -504,7 +504,7 @@ char *hl_highlight_ex(hl_ctx_t *ctx,
     sb_init(&state.sb);
     state.theme = ctx->theme;
 
-    int rc = hl_tokenize(ctx, code, code_len, lang, highlight_callback, &state);
+    int32_t rc = hl_tokenize(ctx, code, code_len, lang, highlight_callback, &state);
     if (rc < 0) {
         sb_free(&state.sb);
         return NULL;
@@ -519,8 +519,8 @@ bool hl_ctx_lang_supported(hl_ctx_t *ctx, const char *lang) {
     return find_language(ctx, lang) != NULL;
 }
 
-static int count_pattern_matches(const char *code, size_t code_len, const char *pattern) {
-    int errorcode;
+static int32_t count_pattern_matches(const char *code, size_t code_len, const char *pattern) {
+    int32_t errorcode;
     PCRE2_SIZE erroroffset;
 
     pcre2_code *re = pcre2_compile(
@@ -540,11 +540,11 @@ static int count_pattern_matches(const char *code, size_t code_len, const char *
         return 0;
     }
 
-    int count = 0;
+    int32_t count = 0;
     size_t offset = 0;
 
     while (offset < code_len) {
-        int rc = pcre2_match(
+        int32_t rc = pcre2_match(
             re,
             (PCRE2_SPTR)code,
             code_len,
@@ -571,7 +571,7 @@ static int count_pattern_matches(const char *code, size_t code_len, const char *
 
 typedef struct {
     const char *lang;
-    int score;
+    int32_t score;
 } lang_score_t;
 
 const char *hl_ctx_detect_language(hl_ctx_t *ctx, const char *code, size_t code_len) {
@@ -589,9 +589,9 @@ const char *hl_ctx_detect_language(hl_ctx_t *ctx, const char *code, size_t code_
             const hl_detect_rule_t *rule = &lang->detect[j];
             if (!rule->pattern) continue;
 
-            int matches = count_pattern_matches(code, code_len, rule->pattern);
+            int32_t matches = count_pattern_matches(code, code_len, rule->pattern);
             if (matches > 0) {
-                int total_score = matches * rule->score;
+                int32_t total_score = matches * rule->score;
 
                 size_t idx = SIZE_MAX;
                 for (size_t k = 0; k < num_langs; k++) {
@@ -615,7 +615,7 @@ const char *hl_ctx_detect_language(hl_ctx_t *ctx, const char *code, size_t code_
     }
 
     const char *best_lang = "plain";
-    int best_score = 20;
+    int32_t best_score = 20;
 
     for (size_t i = 0; i < num_langs; i++) {
         if (scores[i].score > best_score) {
