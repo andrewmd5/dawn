@@ -23,7 +23,7 @@ DAWN_ENUM(uint8_t) {
 
 //! Parsed command-line arguments
 typedef struct {
-    char *file;             //!< Path to file to open (copied to .dawn)
+    char *file;             //!< Path to file to open
     char *demo_file;        //!< File to replay in demo mode
     const char *error_msg;  //!< Error message
     int8_t theme;           //!< Theme: -1 = not set, 0 = light, 1 = dark
@@ -43,13 +43,6 @@ DawnArgs args_parse(int32_t argc, char *argv[]);
 //! Free resources allocated by args_parse
 //! @param args pointer to arguments structure
 void args_free(DawnArgs *args);
-
-//! Copy a file to the .dawn directory
-//! @param src_path source file path
-//! @param out_path buffer for destination path
-//! @param out_size size of output buffer
-//! @return true on success
-bool args_copy_to_dawn(const char *src_path, char *out_path, size_t out_size);
 
 //! Print usage information to stderr
 void args_print_usage(const char *program_name);

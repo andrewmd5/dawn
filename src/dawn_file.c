@@ -38,29 +38,14 @@ static const char *get_username(void) {
 // #region Session Persistence
 
 void save_session(void) {
-    if (gap_len(&app.text) == 0) return;
+    if (gap_len(&app.text) == 0 || !app.session_path) return;
 
-    // Ensure history directory exists
-    DAWN_BACKEND(app)->mkdir_p(history_dir());
-
-    // Generate new path if first save
-    if (!app.session_path) {
-        static char path[PATH_MAX];
-        DawnTime lt;
-        DAWN_BACKEND(app)->localtime(&lt);
-        snprintf(path, sizeof(path), "%s/%04d-%02d-%02d_%02d%02d%02d.md",
-                 history_dir(), lt.year, lt.mon + 1, lt.mday, lt.hour, lt.min, lt.sec);
-        app.session_path = strdup(path);
-    }
-
-    // Build content with YAML frontmatter
     char *txt = gap_to_str(&app.text);
     size_t txt_len = strlen(txt);
 
     DawnTime lt;
     DAWN_BACKEND(app)->localtime(&lt);
 
-    // Estimate frontmatter size
     size_t fm_size = 256;
     char *content = malloc(fm_size + txt_len + 16);
 

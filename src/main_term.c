@@ -110,11 +110,8 @@ int32_t main(int32_t argc, char *argv[]) {
             return 1;
         }
     } else if (args.file) {
-        // Edit mode: copy to .dawn directory
-        char dest_path[512];
-        if (args_copy_to_dawn(args.file, dest_path, sizeof(dest_path))) {
-            dawn_load_document(dest_path);
-        } else {
+        // Edit mode: open file directly
+        if (!dawn_load_document(args.file)) {
             fprintf(stderr, "dawn: cannot open file: %s\n", args.file);
             dawn_engine_shutdown();
             dawn_ctx_shutdown(&app.ctx);

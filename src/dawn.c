@@ -2765,8 +2765,17 @@ static void render(void) {
 static void new_session(void) {
     gap_free(&app.text);
     gap_init(&app.text, 4096);
+
+    // Generate path in .dawn directory
     free(app.session_path);
-    app.session_path = NULL;
+    DAWN_BACKEND(app)->mkdir_p(history_dir());
+    DawnTime lt;
+    DAWN_BACKEND(app)->localtime(&lt);
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "%s/%04d-%02d-%02d_%02d%02d%02d.md",
+             history_dir(), lt.year, lt.mon + 1, lt.mday, lt.hour, lt.min, lt.sec);
+    app.session_path = strdup(path);
+
     free(app.session_title);
     app.session_title = NULL;
     app.cursor = 0;
@@ -2781,7 +2790,7 @@ static void new_session(void) {
     app.ai_input_len = 0;
     app.ai_input_cursor = 0;
     chat_clear();
-    
+
     #if HAS_LIBAI
     if (app.ai_ready && !app.ai_session) ai_init_session();
     #endif
@@ -3831,7 +3840,7 @@ bool dawn_frame(void) {
     if (app.mode == MODE_WRITING && gap_len(&app.text) > 0 && !app.preview_mode) {
         int64_t now = DAWN_BACKEND(app)->now();
         if (app.last_save_time == 0) app.last_save_time = now;
-        else if (now - app.last_save_time >= 60) {
+        else if (now - app.last_save_time >= 5) {
             save_session();
             app.last_save_time = now;
         }
