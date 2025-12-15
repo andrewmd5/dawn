@@ -1528,7 +1528,12 @@ static void posix_reveal_in_finder(const char *path) {
 }
 
 
-static int64_t posix_time_now(void) {
+static int64_t posix_clock(DawnClock kind) {
+    if (kind == DAWN_CLOCK_MS) {
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+    }
     return (int64_t)time(NULL);
 }
 
@@ -2185,7 +2190,7 @@ const DawnBackend dawn_backend_posix = {
     .reveal = posix_reveal_in_finder,
 
     // Time
-    .now = posix_time_now,
+    .clock = posix_clock,
     .sleep_ms = posix_sleep_ms,
     .localtime = posix_get_local_time,
     .username = posix_get_username,

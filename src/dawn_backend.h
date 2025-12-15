@@ -89,6 +89,11 @@ typedef struct {
     uint8_t wday;           //!< Day of week (0-6)
 } DawnTime;
 
+DAWN_ENUM(uint8_t) {
+    DAWN_CLOCK_SEC,         //!< Seconds since epoch
+    DAWN_CLOCK_MS           //!< Milliseconds (monotonic)
+} DawnClock;
+
 // #endregion
 
 // #region Backend Interface
@@ -155,7 +160,7 @@ typedef struct DawnBackend {
     void (*reveal)(const char *path);
 
     // Time
-    int64_t (*now)(void);
+    int64_t (*clock)(DawnClock kind);
     void (*sleep_ms)(int32_t ms);
     void (*localtime)(DawnTime *out);
     const char *(*username)(void);

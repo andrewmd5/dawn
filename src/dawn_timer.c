@@ -9,7 +9,7 @@ int32_t timer_remaining(void) {
     if (!app.timer_on || app.timer_mins == 0) return app.timer_mins * 60;
     if (app.timer_paused) return (int32_t)app.timer_paused_at;
 
-    int64_t now = DAWN_BACKEND(app)->now();
+    int64_t now = DAWN_BACKEND(app)->clock(DAWN_CLOCK_SEC);
     int64_t elapsed = now - app.timer_start;
     int32_t left = app.timer_mins * 60 - (int32_t)elapsed;
     return left > 0 ? left : 0;
@@ -27,7 +27,7 @@ void timer_check(void) {
 void timer_toggle_pause(void) {
     if (!app.timer_on || app.timer_mins == 0) return;
 
-    int64_t now = DAWN_BACKEND(app)->now();
+    int64_t now = DAWN_BACKEND(app)->clock(DAWN_CLOCK_SEC);
 
     if (app.timer_paused) {
         // Resume: adjust start time to account for pause duration
@@ -41,7 +41,7 @@ void timer_toggle_pause(void) {
 }
 
 void timer_add_minutes(int32_t mins) {
-    int64_t now = DAWN_BACKEND(app)->now();
+    int64_t now = DAWN_BACKEND(app)->clock(DAWN_CLOCK_SEC);
 
     if (!app.timer_on) {
         // Start new timer

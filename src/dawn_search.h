@@ -16,6 +16,9 @@
 //! Maximum search query length
 #define SEARCH_MAX_QUERY 128
 
+//! Debounce delay in milliseconds
+#define SEARCH_DEBOUNCE_MS 150
+
 // #endregion
 
 // #region Types
@@ -41,16 +44,25 @@ typedef struct {
     int32_t query_cursor;                          //!< Query cursor position
     int32_t scroll;                                //!< Scroll offset
     bool case_sensitive;                       //!< Case sensitivity
+    int64_t last_change_time;                  //!< Timestamp of last query change (ms)
+    bool dirty;                                //!< Query changed, needs re-search
 } SearchState;
 
 // #endregion
 
 // #region Search Operations
 
-//! Perform search on document
+//! Mark query as changed (for debounce)
+//! @param state search state
+//! @param now_ms current timestamp in milliseconds
+void search_mark_dirty(SearchState *state, int64_t now_ms);
+
+//! Perform search on document (with debounce)
 //! @param gb gap buffer containing document
 //! @param state search state (uses state->query)
-void search_find(const GapBuffer *gb, SearchState *state);
+//! @param now_ms current timestamp in milliseconds
+//! @return true if search was performed, false if debounced/skipped
+bool search_find(const GapBuffer *gb, SearchState *state, int64_t now_ms);
 
 //! Get currently selected result (or NULL if none)
 //! @param state search state

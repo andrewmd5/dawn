@@ -10,6 +10,13 @@
 void search_init(SearchState *state) {
     memset(state, 0, sizeof(SearchState));
     state->case_sensitive = false;
+    state->dirty = false;
+    state->last_change_time = 0;
+}
+
+void search_mark_dirty(SearchState *state, int64_t now_ms) {
+    state->dirty = true;
+    state->last_change_time = now_ms;
 }
 
 // #endregion
@@ -97,27 +104,35 @@ static void build_context(const GapBuffer *gb, SearchResult *r) {
     r->context_len = ci;
 }
 
-//! Count line number at position
-static int32_t count_line_at(const GapBuffer *gb, size_t pos) {
-    int32_t line = 1;
-    for (size_t p = 0; p < pos; p++) {
-        if (gap_at(gb, p) == '\n') line++;
+//! Count newlines between two positions (for incremental line counting)
+static int32_t count_newlines_between(const GapBuffer *gb, size_t from, size_t to) {
+    int32_t count = 0;
+    for (size_t p = from; p < to; p++) {
+        if (gap_at(gb, p) == '\n') count++;
     }
-    return line;
+    return count;
 }
 
 // #endregion
 
 // #region Search Operations
 
-void search_find(const GapBuffer *gb, SearchState *state) {
+bool search_find(const GapBuffer *gb, SearchState *state, int64_t now_ms) {
+    // Debounce: only search if dirty and enough time has passed
+    if (!state->dirty) return false;
+    if (now_ms - state->last_change_time < SEARCH_DEBOUNCE_MS) return false;
+
+    // Clear dirty flag and perform search
+    state->dirty = false;
     state->count = 0;
     state->selected = 0;
     state->scroll = 0;
 
-    if (state->query_len == 0) return;
+    if (state->query_len == 0) return true;
 
     size_t pos = 0;
+    size_t last_pos = 0;
+    int32_t current_line = 1;
 
     while (state->count < SEARCH_MAX_RESULTS) {
         pos = find_match(gb, pos, state->query, state->query_len, state->case_sensitive);
@@ -126,13 +141,19 @@ void search_find(const GapBuffer *gb, SearchState *state) {
         SearchResult *r = &state->results[state->count];
         r->pos = pos;
         r->len = (size_t)state->query_len;
-        r->line_num = count_line_at(gb, pos);
+
+        // Incremental line counting - only count newlines since last match
+        current_line += count_newlines_between(gb, last_pos, pos);
+        r->line_num = current_line;
+        last_pos = pos;
 
         build_context(gb, r);
 
         state->count++;
         pos++;
     }
+
+    return true;
 }
 
 const SearchResult *search_get_selected(const SearchState *state) {

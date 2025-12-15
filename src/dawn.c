@@ -2095,7 +2095,7 @@ static void render_ai_panel(const Layout *L) {
         set_bg(get_ai_bg());
         set_fg(get_dim());
         out_str("ai  ");
-        int64_t now = DAWN_BACKEND(app)->now();
+        int64_t now = DAWN_BACKEND(app)->clock(DAWN_CLOCK_SEC);
         int32_t phase = (int32_t)(now % 4);
         const char *dots[] = {"·  ", "·· ", "···", "   "};
         out_str(dots[phase]);
@@ -2749,6 +2749,7 @@ static void render(void) {
             render_toc();
             break;
         case MODE_SEARCH:
+            search_find(&app.text, (SearchState *)app.search_state, DAWN_BACKEND(app)->clock(DAWN_CLOCK_MS));
             render_writing();
             render_search();
             break;
@@ -2783,7 +2784,7 @@ static void new_session(void) {
     app.timer_done = false;
     app.timer_on = (app.timer_mins > 0);
     if (app.timer_on) {
-        app.timer_start = DAWN_BACKEND(app)->now();
+        app.timer_start = DAWN_BACKEND(app)->clock(DAWN_CLOCK_SEC);
     }
     app.mode = MODE_WRITING;
     app.ai_open = false;
@@ -2855,8 +2856,10 @@ static void handle_writing(int32_t key) {
                 SearchState *search = (SearchState *)app.search_state;
                 search->selected = 0;
                 search->scroll = 0;
-                // Keep previous query for convenience
-                search_find(&app.text, search);
+                // Mark dirty to trigger immediate search with previous query
+                if (search->query_len > 0) {
+                    search_mark_dirty(search, 0);  // time=0 ensures immediate search
+                }
                 MODE_PUSH(MODE_SEARCH);
             }
             break;
@@ -3737,14 +3740,14 @@ static void handle_input(void) {
                         if (search->query_len > 0) {
                             search->query_len--;
                             search->query[search->query_len] = '\0';
-                            search_find(&app.text, search);
+                            search_mark_dirty(search, DAWN_BACKEND(app)->clock(DAWN_CLOCK_MS));
                         }
                         break;
                     default:
                         if (key >= 32 && key < 127 && search->query_len < SEARCH_MAX_QUERY - 1) {
                             search->query[search->query_len++] = (char)key;
                             search->query[search->query_len] = '\0';
-                            search_find(&app.text, search);
+                            search_mark_dirty(search, DAWN_BACKEND(app)->clock(DAWN_CLOCK_MS));
                         }
                         break;
                 }
@@ -3838,7 +3841,7 @@ bool dawn_frame(void) {
     if (app.timer_on) timer_check();
 
     if (app.mode == MODE_WRITING && gap_len(&app.text) > 0 && !app.preview_mode) {
-        int64_t now = DAWN_BACKEND(app)->now();
+        int64_t now = DAWN_BACKEND(app)->clock(DAWN_CLOCK_SEC);
         if (app.last_save_time == 0) app.last_save_time = now;
         else if (now - app.last_save_time >= 5) {
             save_session();

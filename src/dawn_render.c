@@ -389,7 +389,7 @@ void render_finished(void) {
 
     char stats[64];
     if (app.timer_start > 0) {
-        int64_t now = DAWN_BACKEND(app)->now();
+        int64_t now = DAWN_BACKEND(app)->clock(DAWN_CLOCK_SEC);
         int64_t elapsed_secs;
         if (app.timer_paused) {
             elapsed_secs = app.timer_mins * 60 - app.timer_paused_at;

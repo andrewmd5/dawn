@@ -477,6 +477,10 @@ EM_JS(double, js_time_now_double, (), {
     return Date.now() / 1000.0;
 });
 
+EM_JS(double, js_time_now_ms_double, (), {
+    return Date.now();
+});
+
 EM_JS(void, js_get_local_time, (int32_t* year, int32_t* mon, int32_t* mday,
                                  int32_t* hour, int32_t* min, int32_t* sec, int32_t* wday), {
     const d = new Date();
@@ -1222,7 +1226,10 @@ static void web_reveal_in_finder(const char *path) {
     }, path);
 }
 
-static int64_t web_time_now(void) {
+static int64_t web_clock(DawnClock kind) {
+    if (kind == DAWN_CLOCK_MS) {
+        return (int64_t)js_time_now_ms_double();
+    }
     return (int64_t)js_time_now_double();
 }
 
@@ -1419,7 +1426,7 @@ const DawnBackend dawn_backend_web = {
     .reveal = web_reveal_in_finder,
 
     // Time
-    .now = web_time_now,
+    .clock = web_clock,
     .sleep_ms = web_sleep_ms,
     .localtime = web_get_local_time,
     .username = web_get_username,
