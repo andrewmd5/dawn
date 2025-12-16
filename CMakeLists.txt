@@ -64,7 +64,7 @@ if(NOT EMSCRIPTEN)
         target_link_options(dawn PRIVATE ${SANITIZER_FLAGS})
     endif()
 
-    target_link_libraries(dawn PRIVATE pcre2-8-static utf8proc CURL::libcurl)
+    target_link_libraries(dawn PRIVATE pcre2-8-static utf8proc CURL::libcurl m)
 
     if(APPLE)
         target_link_libraries(dawn PRIVATE "-framework ApplicationServices")
@@ -119,7 +119,7 @@ if(NOT EMSCRIPTEN)
         target_link_options(test-block PRIVATE ${SANITIZER_FLAGS})
     endif()
 
-    target_link_libraries(test-block PRIVATE pcre2-8-static utf8proc)
+    target_link_libraries(test-block PRIVATE pcre2-8-static utf8proc m)
 else()
     file(GLOB WEB_SRCS src/dawn*.c)
     list(FILTER WEB_SRCS EXCLUDE REGEX "dawn_args.c")
