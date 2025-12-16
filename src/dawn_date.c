@@ -710,4 +710,25 @@ void dawn_format_iso_time(const DawnTime* t, char* buf, size_t size)
         t->year, t->mon + 1, t->mday, t->hour, t->min, t->sec);
 }
 
+void dawn_format_filename_time(const DawnTime* t, char* buf, size_t size)
+{
+    if (!t || !buf || size == 0)
+        return;
+    snprintf(buf, size, "%04d-%02d-%02d_%02d%02d%02d",
+        t->year, t->mon + 1, t->mday, t->hour, t->min, t->sec);
+}
+
+void dawn_format_human_time(const DawnTime* t, char* buf, size_t size)
+{
+    if (!t || !buf || size == 0)
+        return;
+    static const char* months[] = { "", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+    int mo = t->mon + 1;
+    if (mo < 1 || mo > 12)
+        mo = 1;
+    snprintf(buf, size, "%s %d, %d at %d:%02d",
+        months[mo], t->mday, t->year, t->hour, t->min);
+}
+
 // #endregion

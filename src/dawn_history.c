@@ -2,6 +2,7 @@
 
 #include "dawn_history.h"
 #include "cJSON.h"
+#include "dawn_date.h"
 #include "dawn_file.h"
 #include "dawn_fm.h"
 #include "dawn_types.h"
@@ -28,15 +29,7 @@ static void format_date(int64_t timestamp, char* buf, size_t len)
 
     DawnTime lt;
     DAWN_BACKEND(app)->localtime_from(&lt, timestamp);
-
-    static const char* months[] = { "", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
-    int32_t mo = lt.mon + 1;
-    if (mo < 1 || mo > 12)
-        mo = 1;
-
-    snprintf(buf, len, "%s %d, %d at %d:%02d",
-        months[mo], lt.mday, lt.year, lt.hour, lt.min);
+    dawn_format_human_time(&lt, buf, len);
 }
 
 // #endregion

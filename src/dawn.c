@@ -3277,9 +3277,10 @@ static void new_session(void)
     DAWN_BACKEND(app)->mkdir_p(history_dir());
     DawnTime lt;
     DAWN_BACKEND(app)->localtime(&lt);
+    char timestamp[20];
+    dawn_format_filename_time(&lt, timestamp, sizeof(timestamp));
     char path[PATH_MAX];
-    snprintf(path, sizeof(path), "%s/%04d-%02d-%02d_%02d%02d%02d.md",
-        history_dir(), lt.year, lt.mon + 1, lt.mday, lt.hour, lt.min, lt.sec);
+    snprintf(path, sizeof(path), "%s/%s.md", history_dir(), timestamp);
     app.session_path = strdup(path);
 
     fm_free(app.frontmatter);

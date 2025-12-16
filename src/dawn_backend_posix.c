@@ -79,6 +79,9 @@
 #define UNDERLINE_DASHED CSI "4:5m"
 #define UNDERLINE_OFF CSI "4:0m"
 
+// Cache key buffer: path + ":" + mtime (INT64_MAX is 19 digits) + null
+#define CACHE_KEY_SIZE (PATH_MAX + 21)
+
 #define TEXT_SIZE_OSC ESC "]66;"
 #define TEXT_SIZE_ST ESC "\\"
 
@@ -2341,9 +2344,7 @@ static bool ensure_png_cached(const char* src_path, char* out, size_t out_size)
 
     int64_t mtime = posix_get_mtime(abs_path);
 
-    // Create cache key from path + mtime
-    // INT64_MAX is 19 digits, plus colon separator
-    char key[PATH_MAX + 21];
+    char key[CACHE_KEY_SIZE];
     snprintf(key, sizeof(key), "%s:%lld", abs_path, (long long)mtime);
 
     char hash_hex[65];

@@ -26,4 +26,18 @@ void dawn_format_iso_date(const DawnDate* d, char* buf, size_t size);
 //! @param size Size of output buffer (recommend 24+ bytes)
 void dawn_format_iso_time(const DawnTime* t, char* buf, size_t size);
 
+//! Format DawnTime as filename-safe timestamp
+//! Output format: YYYY-MM-DD_HHMMSS
+//! @param t Input DawnTime structure
+//! @param buf Output buffer
+//! @param size Size of output buffer (recommend 20+ bytes)
+void dawn_format_filename_time(const DawnTime* t, char* buf, size_t size);
+
+//! Format DawnTime as human-readable date
+//! Output format: "Mon D, YYYY at H:MM"
+//! @param t Input DawnTime structure
+//! @param buf Output buffer
+//! @param size Size of output buffer (recommend 32+ bytes)
+void dawn_format_human_time(const DawnTime* t, char* buf, size_t size);
+
 #endif // DAWN_DATE_H

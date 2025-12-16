@@ -8,6 +8,7 @@
 #include "cJSON.h"
 #include "dawn_block.h"
 #include "dawn_chat.h"
+#include "dawn_date.h"
 #include "dawn_fm.h"
 #include "dawn_gap.h"
 #include "dawn_history.h"
@@ -69,8 +70,7 @@ void save_session(void)
     DawnTime lt;
     DAWN_BACKEND(app)->localtime(&lt);
     char date_buf[32];
-    snprintf(date_buf, sizeof(date_buf), "%04d-%02d-%02dT%02d:%02d:%02dZ",
-        lt.year, lt.mon + 1, lt.mday, lt.hour, lt.min, lt.sec);
+    dawn_format_iso_time(&lt, date_buf, sizeof(date_buf));
     fm_set_string(fm, "date", date_buf);
 
     // Serialize frontmatter
