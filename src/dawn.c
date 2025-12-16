@@ -4179,7 +4179,7 @@ static void handle_input(void)
                     FmEditField* nf = &app.fm_edit.fields[app.fm_edit.field_count++];
                     memset(nf, 0, sizeof(*nf));
                     app.fm_edit.new_key[app.fm_edit.new_key_len] = '\0';
-                    strncpy(nf->key, app.fm_edit.new_key, 63);
+                    memcpy(nf->key, app.fm_edit.new_key, app.fm_edit.new_key_len + 1);
                     nf->kind = FM_FIELD_STRING;
                     app.fm_edit.current_field = app.fm_edit.field_count - 1;
                 }

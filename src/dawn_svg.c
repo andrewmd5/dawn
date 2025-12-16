@@ -20,10 +20,7 @@ bool svg_is_svg_file(const char* path)
         return false;
     ext++;
 
-    return (ext[0] == 's' || ext[0] == 'S') &&
-           (ext[1] == 'v' || ext[1] == 'V') &&
-           (ext[2] == 'g' || ext[2] == 'G') &&
-           ext[3] == '\0';
+    return (ext[0] == 's' || ext[0] == 'S') && (ext[1] == 'v' || ext[1] == 'V') && (ext[2] == 'g' || ext[2] == 'G') && ext[3] == '\0';
 }
 
 bool svg_rasterize(char* svg_data, uint8_t** out_pixels, int32_t* out_width, int32_t* out_height)
