@@ -153,6 +153,7 @@ else()
         ${CMAKE_BINARY_DIR}/third-party/pcre2
         third-party/pcre2/src
         third-party/libfyaml/include
+        third-party/nanosvg/src
     )
 
     target_compile_options(dawn-web PRIVATE -O2)
