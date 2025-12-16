@@ -175,6 +175,20 @@ static inline void track_cursor(const RenderCtx* ctx, RenderState* rs)
 #define GET_LINE_SCALE(line_style) \
     (HAS_CAP(DAWN_CAP_TEXT_SIZING) ? block_get_scale(line_style) : 1)
 
+//! Fill rest of line with selection background if position is selected
+#define FILL_SEL_TO_EOL(ctx, rs, pos, sel_s, sel_e, screen_row)                               \
+    do {                                                                                       \
+        if (has_selection() && (pos) >= (sel_s) && (pos) < (sel_e) &&                          \
+            IS_ROW_VISIBLE(&(ctx)->L, (screen_row), (ctx)->max_row)) {                         \
+            int32_t _rem = (ctx)->L.text_width - (rs)->col_width;                              \
+            if (_rem > 0) {                                                                    \
+                move_to((screen_row), (ctx)->L.margin + 1 + (rs)->col_width);                  \
+                set_bg(get_select());                                                          \
+                out_spaces(_rem);                                                              \
+            }                                                                                  \
+        }                                                                                      \
+    } while (0)
+
 //! Skip leading whitespace for wrapped lines
 static inline size_t skip_leading_space(const GapBuffer* gb, size_t pos, size_t end)
 {
@@ -5494,6 +5508,7 @@ static void render_block(const RenderCtx* ctx, RenderState* rs, const Block* blo
 
             // Handle newline
             if (c == '\n') {
+                FILL_SEL_TO_EOL(ctx, rs, rs->pos, sel_s, sel_e, screen_row);
                 rs->pos++;
                 int32_t newline_scale = GET_LINE_SCALE(rs->line_style);
                 rs->virtual_row += newline_scale;
@@ -5641,6 +5656,7 @@ static void render_block(const RenderCtx* ctx, RenderState* rs, const Block* blo
 
             // End of segment - wrap to next line if needed
             if (rs->pos >= seg_end && rs->pos < line_end) {
+                FILL_SEL_TO_EOL(ctx, rs, rs->pos, sel_s, sel_e, screen_row);
                 // In print mode, reset background before line wrap to prevent code bg overflow
                 if (ctx->is_print_mode && IS_ROW_VISIBLE(&ctx->L, screen_row, ctx->max_row)) {
                     reset_attrs();
