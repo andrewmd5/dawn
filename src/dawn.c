@@ -117,6 +117,9 @@ typedef struct {
 //! Check if any editing is allowed (not in preview mode)
 #define CAN_MODIFY() (!app.preview_mode)
 
+//! Check if key is a printable character (not a special key)
+#define IS_PRINTABLE(k) ((k) >= 32 && (k) != 127 && (k) < DAWN_KEY_UP)
+
 // #endregion
 
 // #region Pure Helper Functions
@@ -3836,14 +3839,20 @@ static void handle_writing(int32_t key)
     default:
         if (!CAN_MODIFY())
             break;
-        if (key >= 32 && key < 127) {
+        // Accept printable chars but not special keys (DAWN_KEY_UP=1000 and above)
+        if (IS_PRINTABLE(key)) {
             save_undo_state();
             delete_selection_if_any();
-            gap_insert(&app.text, app.cursor, (char)key);
-            app.cursor++;
-            check_auto_newline((char)key);
-            if (key == ']')
-                footnote_maybe_create_at_cursor(&app.text, app.cursor);
+            uint8_t utf8_buf[4];
+            utf8proc_ssize_t len = utf8proc_encode_char((utf8proc_int32_t)key, utf8_buf);
+            if (len > 0) {
+                gap_insert_str(&app.text, app.cursor, (char*)utf8_buf, (size_t)len);
+                app.cursor += (size_t)len;
+                if (key < 128)
+                    check_auto_newline((char)key);
+                if (key == ']')
+                    footnote_maybe_create_at_cursor(&app.text, app.cursor);
+            }
         }
         break;
     }
@@ -3882,11 +3891,13 @@ static void handle_ai_input(int32_t key)
     case 127:
     case 8:
         if (app.ai_input_cursor > 0) {
-            memmove(app.ai_input + app.ai_input_cursor - 1,
+            int32_t prev = str_utf8_prev(app.ai_input, app.ai_input_cursor);
+            int32_t char_len = app.ai_input_cursor - prev;
+            memmove(app.ai_input + prev,
                 app.ai_input + app.ai_input_cursor,
                 app.ai_input_len - app.ai_input_cursor);
-            app.ai_input_len--;
-            app.ai_input_cursor--;
+            app.ai_input_len -= char_len;
+            app.ai_input_cursor = prev;
         }
         break;
 
@@ -3911,11 +3922,11 @@ static void handle_ai_input(int32_t key)
 
     case DAWN_KEY_LEFT:
         if (app.ai_input_cursor > 0)
-            app.ai_input_cursor--;
+            app.ai_input_cursor = str_utf8_prev(app.ai_input, app.ai_input_cursor);
         break;
     case DAWN_KEY_RIGHT:
         if (app.ai_input_cursor < app.ai_input_len)
-            app.ai_input_cursor++;
+            app.ai_input_cursor = str_utf8_next(app.ai_input, app.ai_input_cursor, app.ai_input_len);
         break;
 
     case DAWN_KEY_UP: {
@@ -3972,14 +3983,8 @@ static void handle_ai_input(int32_t key)
         break;
 
     default:
-        if (key >= 32 && key < 127 && app.ai_input_len < MAX_AI_INPUT - 1) {
-            memmove(app.ai_input + app.ai_input_cursor + 1,
-                app.ai_input + app.ai_input_cursor,
-                app.ai_input_len - app.ai_input_cursor);
-            app.ai_input[app.ai_input_cursor] = (char)key;
-            app.ai_input_len++;
-            app.ai_input_cursor++;
-        }
+        if (IS_PRINTABLE(key))
+            str_insert_codepoint(app.ai_input, MAX_AI_INPUT, &app.ai_input_len, &app.ai_input_cursor, key);
         break;
     }
 }
@@ -4690,16 +4695,18 @@ static void handle_input(void)
         case 127:
         case '\b':
             if (toc->filter_len > 0) {
-                toc->filter_len--;
+                toc->filter_len = str_utf8_prev(toc->filter, toc->filter_len);
                 toc->filter[toc->filter_len] = '\0';
                 toc_filter(toc);
             }
             break;
         default:
-            if (key >= 32 && key < 127 && toc->filter_len < (int32_t)sizeof(toc->filter) - 1) {
-                toc->filter[toc->filter_len++] = (char)key;
-                toc->filter[toc->filter_len] = '\0';
-                toc_filter(toc);
+            if (IS_PRINTABLE(key)) {
+                size_t len = (size_t)toc->filter_len;
+                if (str_append_codepoint(toc->filter, sizeof(toc->filter), &len, key)) {
+                    toc->filter_len = (int32_t)len;
+                    toc_filter(toc);
+                }
             }
             break;
         }
@@ -4751,16 +4758,18 @@ static void handle_input(void)
         case 127:
         case '\b':
             if (search->query_len > 0) {
-                search->query_len--;
+                search->query_len = str_utf8_prev(search->query, search->query_len);
                 search->query[search->query_len] = '\0';
                 search_mark_dirty(search, DAWN_BACKEND(app)->clock(DAWN_CLOCK_MS));
             }
             break;
         default:
-            if (key >= 32 && key < 127 && search->query_len < SEARCH_MAX_QUERY - 1) {
-                search->query[search->query_len++] = (char)key;
-                search->query[search->query_len] = '\0';
-                search_mark_dirty(search, DAWN_BACKEND(app)->clock(DAWN_CLOCK_MS));
+            if (IS_PRINTABLE(key)) {
+                size_t len = (size_t)search->query_len;
+                if (str_append_codepoint(search->query, SEARCH_MAX_QUERY, &len, key)) {
+                    search->query_len = (int32_t)len;
+                    search_mark_dirty(search, DAWN_BACKEND(app)->clock(DAWN_CLOCK_MS));
+                }
             }
             break;
         }

@@ -63,15 +63,16 @@ static struct {
     int32_t key_queue[64];
     int32_t key_queue_head;
     int32_t key_queue_tail;
-} web_state = { 0 };
+} web_state = { 0};
 
+// clang-format off
 EM_JS(void, js_init_canvas, (), {
     let canvas = document.getElementById('dawn-canvas');
     if (!canvas) {
         canvas = document.createElement('canvas');
         canvas.id = 'dawn-canvas';
         document.body.appendChild(canvas);
-    }
+   }
 
     document.body.style.margin = '0';
     document.body.style.padding = '0';
@@ -110,8 +111,8 @@ EM_JS(void, js_init_canvas, (), {
 
         if (Module._web_on_resize) {
             Module._web_on_resize(window.dawnCols, window.dawnRows);
-        }
-    };
+       }
+   };
 
     window.addEventListener('resize', updateSize);
     updateSize();
@@ -124,7 +125,7 @@ EM_JS(void, js_get_size, (int32_t* cols, int32_t* rows), {
 
 EM_JS(void, js_clear_screen, (int32_t r, int32_t g, int32_t b), {
     const ctx = window.dawnCtx;
-    ctx.fillStyle = `rgb($ { r }, $ { g }, $ { b })`;
+    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
     ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
 });
 
@@ -144,15 +145,15 @@ EM_JS(void, js_draw_text_scaled, (int32_t col, int32_t row, const char* text, in
     const height = scale * window.dawnCellHeight;
 
     if (bg_r >= 0) {
-        ctx.fillStyle = `rgb($ { bg_r }, $ { bg_g }, $ { bg_b })`;
+        ctx.fillStyle = `rgb(${bg_r}, ${bg_g}, ${bg_b})`;
         ctx.fillRect(x, y, width, height);
-    }
+   }
 
     const style = (italic ? "italic " : "") + (bold ? "bold " : "");
     ctx.font = style + scaledFontSize + "px 'SF Mono', 'Monaco', 'Menlo', 'Consolas', 'DejaVu Sans Mono', monospace";
 
     let alpha = dim ? 0.6 : 1.0;
-    ctx.fillStyle = `rgba($ { fg_r }, $ { fg_g }, $ { fg_b }, $ { alpha })`;
+    ctx.fillStyle = `rgba(${fg_r}, ${fg_g}, ${fg_b}, ${alpha})`;
     ctx.fillText(str, x, y + 2);
 
     ctx.font = window.dawnFontSize + "px 'SF Mono', 'Monaco', 'Menlo', 'Consolas', 'DejaVu Sans Mono', monospace";
@@ -171,15 +172,15 @@ EM_JS(void, js_draw_text_scaled_frac, (int32_t col, int32_t row, const char* tex
     const height = cell_scale * window.dawnCellHeight;
 
     if (bg_r >= 0) {
-        ctx.fillStyle = `rgb($ { bg_r }, $ { bg_g }, $ { bg_b })`;
+        ctx.fillStyle = `rgb(${bg_r}, ${bg_g}, ${bg_b})`;
         ctx.fillRect(x, y, width, height);
-    }
+   }
 
     const style = (italic ? "italic " : "") + (bold ? "bold " : "");
     ctx.font = style + scaledFontSize + "px 'SF Mono', 'Monaco', 'Menlo', 'Consolas', 'DejaVu Sans Mono', monospace";
 
     let alpha = dim ? 0.6 : 1.0;
-    ctx.fillStyle = `rgba($ { fg_r }, $ { fg_g }, $ { fg_b }, $ { alpha })`;
+    ctx.fillStyle = `rgba(${fg_r}, ${fg_g}, ${fg_b}, ${alpha})`;
     ctx.fillText(str, x, y + 2);
 
     ctx.font = window.dawnFontSize + "px 'SF Mono', 'Monaco', 'Menlo', 'Consolas', 'DejaVu Sans Mono', monospace";
@@ -193,15 +194,15 @@ EM_JS(void, js_draw_text, (int32_t col, int32_t row, const char* text, int32_t n
     const width = num_cols * window.dawnCellWidth;
 
     if (bg_r >= 0) {
-        ctx.fillStyle = `rgb($ { bg_r }, $ { bg_g }, $ { bg_b })`;
+        ctx.fillStyle = `rgb(${bg_r}, ${bg_g}, ${bg_b})`;
         ctx.fillRect(x, y, width, window.dawnCellHeight);
-    }
+   }
 
     const style = (italic ? "italic " : "") + (bold ? "bold " : "");
     ctx.font = style + window.dawnFontSize + "px 'SF Mono', 'Monaco', 'Menlo', 'Consolas', 'DejaVu Sans Mono', monospace";
 
     let alpha = dim ? 0.6 : 1.0;
-    ctx.fillStyle = `rgba($ { fg_r }, $ { fg_g }, $ { fg_b }, $ { alpha })`;
+    ctx.fillStyle = `rgba(${fg_r}, ${fg_g}, ${fg_b}, ${alpha})`;
     ctx.fillText(str, x, y + 2);
 
     if (underline) {
@@ -211,7 +212,7 @@ EM_JS(void, js_draw_text, (int32_t col, int32_t row, const char* text, int32_t n
         ctx.moveTo(x, y + window.dawnCellHeight - 2);
         ctx.lineTo(x + width, y + window.dawnCellHeight - 2);
         ctx.stroke();
-    }
+   }
 
     if (strikethrough) {
         ctx.strokeStyle = ctx.fillStyle;
@@ -220,7 +221,7 @@ EM_JS(void, js_draw_text, (int32_t col, int32_t row, const char* text, int32_t n
         ctx.moveTo(x, y + window.dawnCellHeight / 2);
         ctx.lineTo(x + width, y + window.dawnCellHeight / 2);
         ctx.stroke();
-    }
+   }
 });
 
 EM_JS(void, js_draw_cursor, (int32_t col, int32_t row, int32_t r, int32_t g, int32_t b), {
@@ -235,9 +236,9 @@ EM_JS(void, js_draw_cursor, (int32_t col, int32_t row, int32_t r, int32_t g, int
         ctx.font = '12px monospace';
         ctx.fillText('R' + row + ' C' + col, 10, 22);
         ctx.fillText('Rows:' + window.dawnRows, 10, 38);
-    }
+   }
 
-    ctx.fillStyle = `rgb($ { r }, $ { g }, $ { b })`;
+    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
     ctx.fillRect(x, y, 2, window.dawnCellHeight);
 });
 
@@ -246,7 +247,7 @@ EM_JS(void, js_clear_rect, (int32_t col, int32_t row, int32_t width, int32_t hei
     const x = (col - 1) * window.dawnCellWidth;
     const y = (row - 1) * window.dawnCellHeight;
 
-    ctx.fillStyle = `rgb($ { r }, $ { g }, $ { b })`;
+    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
     ctx.fillRect(x, y, width * window.dawnCellWidth, height * window.dawnCellHeight);
 });
 
@@ -256,7 +257,7 @@ EM_JS(void, js_setup_input, (), {
     canvas.tabIndex = 0;
     canvas.focus();
 
-    canvas.addEventListener('keydown', (e) = > {
+    canvas.addEventListener('keydown', (e) => {
         e.preventDefault();
 
         let key = 0;
@@ -279,46 +280,46 @@ EM_JS(void, js_setup_input, (), {
             const code = e.key.toLowerCase().charCodeAt(0);
             if (code >= 97 && code <= 122) {
                 key = code - 96;
-            }
-        }
+           }
+       }
         else if (e.key.length === 1) {
             key = e.key.charCodeAt(0);
-        }
+       }
 
         if (e.altKey || e.metaKey) {
             if (e.key === 'ArrowLeft') key = e.shiftKey ? 1019 : 1017;
             else if (e.key === 'ArrowRight') key = e.shiftKey ? 1020 : 1018;
-        }
+       }
 
         if (e.ctrlKey) {
             if (e.key === 'ArrowLeft') key = e.shiftKey ? 1015 : 1013;
             else if (e.key === 'ArrowRight') key = e.shiftKey ? 1016 : 1014;
-        }
+       }
 
         if (key > 0) {
             Module._web_on_key(key);
-        } });
+       }});
 
-    canvas.addEventListener('mousedown', (e) = > {
+    canvas.addEventListener('mousedown', (e) => {
         const col = Math.floor(e.offsetX / window.dawnCellWidth) + 1;
         const row = Math.floor(e.offsetY / window.dawnCellHeight) + 1;
-        Module._web_on_mouse(col, row, e.button, 1); });
+        Module._web_on_mouse(col, row, e.button, 1);});
 
-    canvas.addEventListener('mouseup', (e) = > {
+    canvas.addEventListener('mouseup', (e) => {
         const col = Math.floor(e.offsetX / window.dawnCellWidth) + 1;
         const row = Math.floor(e.offsetY / window.dawnCellHeight) + 1;
-        Module._web_on_mouse(col, row, e.button, 0); });
+        Module._web_on_mouse(col, row, e.button, 0);});
 
     let lastWheelTime = 0;
     let wheelAccum = 0;
-    canvas.addEventListener('wheel', (e) = > {
+    canvas.addEventListener('wheel', (e) => {
         e.preventDefault();
 
         const now = Date.now();
         let delta = e.deltaY;
-        if (e.deltaMode == = 1)
+        if (e.deltaMode === 1)
             delta *= 20;
-        if (e.deltaMode == = 2)
+        if (e.deltaMode === 2)
             delta *= 100;
 
         wheelAccum += delta;
@@ -328,7 +329,7 @@ EM_JS(void, js_setup_input, (), {
         lastWheelTime = now;
 
         const lines = Math.round(wheelAccum / 40);
-        if (lines == = 0)
+        if (lines === 0)
             return;
         wheelAccum = 0;
 
@@ -336,19 +337,19 @@ EM_JS(void, js_setup_input, (), {
         const count = Math.min(Math.abs(lines), 5);
         for (let i = 0; i < count; i++) {
             Module._web_on_key(key);
-        }
-    },
-        { passive : false });
+       }
+   },
+        { passive: false});
 
-    canvas.addEventListener('blur', () = > { setTimeout(() = > canvas.focus(), 10); });
+    canvas.addEventListener('blur', () => { setTimeout(() => canvas.focus(), 10);});
 });
 
 // Clipboard
 EM_JS(void, js_clipboard_copy, (const char* text), {
     const str = UTF8ToString(text);
-    navigator.clipboard.writeText(str).catch(err = > {
+    navigator.clipboard.writeText(str).catch(err => {
         console.error('Failed to copy:', err);
-    });
+   });
 });
 
 EM_ASYNC_JS(char*, js_clipboard_paste, (), {
@@ -372,32 +373,32 @@ EM_JS(void, js_init_filesystem, (), {
     try
     {
         FS.mkdir('/dawn');
-    }
+   }
     catch(e)
     {
         // Directory may already exist
-    }
+   }
 
     // Mount IDBFS for persistent storage
     try
     {
         FS.mount(IDBFS, {}, '/dawn');
-    }
+   }
     catch(e)
     {
         console.log('IDBFS mount:', e.message);
-    }
+   }
 
     // Sync from IndexedDB to memory
-    FS.syncfs(true, (err) = > {
+    FS.syncfs(true, (err) => {
         if (err) console.error('FS sync error:', err);
-        else console.log('Filesystem synced from IndexedDB'); });
+        else console.log('Filesystem synced from IndexedDB');});
 });
 
 EM_JS(void, js_sync_filesystem, (), {
     // Sync from memory to IndexedDB
-    FS.syncfs(false, (err) = > {
-        if (err) console.error('FS sync error:', err); });
+    FS.syncfs(false, (err) => {
+        if (err) console.error('FS sync error:', err);});
 });
 
 // Images
@@ -415,7 +416,7 @@ EM_JS(int32_t, js_display_image, (const char* path, int32_t row, int32_t col, in
         // Return 0 while loading
         if (!img.complete)
             return 0;
-    }
+   }
 
     if (!img.complete || !img.naturalWidth)
         return 0;
@@ -434,11 +435,11 @@ EM_JS(int32_t, js_display_image, (const char* path, int32_t row, int32_t col, in
     if (w > maxW) {
         h = h * maxW / w;
         w = maxW;
-    }
+   }
     if (h > maxH) {
         w = w * maxH / h;
         h = maxH;
-    }
+   }
 
     ctx.drawImage(img, x, y, w, h);
 
@@ -455,13 +456,13 @@ EM_JS(int32_t, js_get_image_size, (const char* path, int32_t* width, int32_t* he
         img = new Image();
         img.src = pathStr;
         window.dawnImages[pathStr] = img;
-    }
+   }
 
     if (!img.complete || !img.naturalWidth) {
         setValue(width, 0, 'i32');
         setValue(height, 0, 'i32');
         return 0;
-    }
+   }
 
     setValue(width, img.naturalWidth, 'i32');
     setValue(height, img.naturalHeight, 'i32');
@@ -496,6 +497,7 @@ EM_JS(const char*, js_get_username, (), {
     stringToUTF8(name, ptr, len);
     return ptr;
 });
+// clang-format on
 
 // Called from JS when window resizes
 EMSCRIPTEN_KEEPALIVE
@@ -515,7 +517,7 @@ void web_on_key(int32_t key)
     if (next_tail != web_state.key_queue_head) {
         web_state.key_queue[web_state.key_queue_tail] = key;
         web_state.key_queue_tail = next_tail;
-    }
+   }
 }
 
 // Called from JS on mouse event
@@ -531,8 +533,8 @@ void web_on_mouse(int32_t col, int32_t row, int32_t button, int32_t pressed)
         if (next_tail != web_state.key_queue_head) {
             web_state.key_queue[web_state.key_queue_tail] = DAWN_KEY_MOUSE_CLICK;
             web_state.key_queue_tail = next_tail;
-        }
-    }
+       }
+   }
 }
 
 static bool web_init(DawnMode mode)
@@ -702,14 +704,14 @@ static void parse_ansi_sgr(const char* params, size_t len)
         if (c >= '0' && c <= '9') {
             current = current * 10 + (c - '0');
             has_current = true;
-        } else if (c == ';' || c == 'm') {
+       } else if (c == ';' || c == 'm') {
             if (has_current || i == 0 || params[i - 1] == ';') {
                 nums[num_count++] = has_current ? current : 0;
-            }
+           }
             current = 0;
             has_current = false;
-        }
-    }
+       }
+   }
 
     // Process SGR codes
     for (int32_t i = 0; i < num_count; i++) {
@@ -855,34 +857,34 @@ static void parse_ansi_sgr(const char* params, size_t len)
                 if (n < 16) {
                     // Standard colors - use the 30-37/90-97 mapping
                     static const uint8_t std_colors[16][3] = {
-                        { 0, 0, 0 }, { 205, 49, 49 }, { 13, 188, 121 }, { 229, 192, 123 },
-                        { 97, 175, 239 }, { 198, 120, 221 }, { 86, 182, 194 }, { 212, 212, 212 },
-                        { 102, 102, 102 }, { 255, 85, 85 }, { 85, 255, 85 }, { 255, 255, 85 },
-                        { 85, 85, 255 }, { 255, 85, 255 }, { 85, 255, 255 }, { 255, 255, 255 }
-                    };
+                        { 0, 0, 0}, { 205, 49, 49}, { 13, 188, 121}, { 229, 192, 123},
+                        { 97, 175, 239}, { 198, 120, 221}, { 86, 182, 194}, { 212, 212, 212},
+                        { 102, 102, 102}, { 255, 85, 85}, { 85, 255, 85}, { 255, 255, 85},
+                        { 85, 85, 255}, { 255, 85, 255}, { 85, 255, 255}, { 255, 255, 255}
+                   };
                     web_state.fg_r = std_colors[n][0];
                     web_state.fg_g = std_colors[n][1];
                     web_state.fg_b = std_colors[n][2];
-                } else if (n < 232) {
+               } else if (n < 232) {
                     // 216-color cube (16-231)
                     n -= 16;
                     web_state.fg_r = (n / 36) * 51;
                     web_state.fg_g = ((n / 6) % 6) * 51;
                     web_state.fg_b = (n % 6) * 51;
-                } else {
+               } else {
                     // Grayscale (232-255)
                     int32_t gray = (n - 232) * 10 + 8;
                     web_state.fg_r = gray;
                     web_state.fg_g = gray;
                     web_state.fg_b = gray;
-                }
-            } else if (i + 4 < num_count && nums[i + 1] == 2) {
+               }
+           } else if (i + 4 < num_count && nums[i + 1] == 2) {
                 // 24-bit color: 38;2;r;g;b
                 web_state.fg_r = nums[i + 2];
                 web_state.fg_g = nums[i + 3];
                 web_state.fg_b = nums[i + 4];
                 i += 4;
-            }
+           }
             break;
 
         // Background colors (40-47, 100-107, 48)
@@ -939,35 +941,35 @@ static void parse_ansi_sgr(const char* params, size_t len)
                 i += 2;
                 if (n < 16) {
                     static const uint8_t std_colors[16][3] = {
-                        { 0, 0, 0 }, { 205, 49, 49 }, { 13, 188, 121 }, { 229, 192, 123 },
-                        { 97, 175, 239 }, { 198, 120, 221 }, { 86, 182, 194 }, { 212, 212, 212 },
-                        { 102, 102, 102 }, { 255, 85, 85 }, { 85, 255, 85 }, { 255, 255, 85 },
-                        { 85, 85, 255 }, { 255, 85, 255 }, { 85, 255, 255 }, { 255, 255, 255 }
-                    };
+                        { 0, 0, 0}, { 205, 49, 49}, { 13, 188, 121}, { 229, 192, 123},
+                        { 97, 175, 239}, { 198, 120, 221}, { 86, 182, 194}, { 212, 212, 212},
+                        { 102, 102, 102}, { 255, 85, 85}, { 85, 255, 85}, { 255, 255, 85},
+                        { 85, 85, 255}, { 255, 85, 255}, { 85, 255, 255}, { 255, 255, 255}
+                   };
                     web_state.bg_r = std_colors[n][0];
                     web_state.bg_g = std_colors[n][1];
                     web_state.bg_b = std_colors[n][2];
-                } else if (n < 232) {
+               } else if (n < 232) {
                     n -= 16;
                     web_state.bg_r = (n / 36) * 51;
                     web_state.bg_g = ((n / 6) % 6) * 51;
                     web_state.bg_b = (n % 6) * 51;
-                } else {
+               } else {
                     int32_t gray = (n - 232) * 10 + 8;
                     web_state.bg_r = gray;
                     web_state.bg_g = gray;
                     web_state.bg_b = gray;
-                }
-            } else if (i + 4 < num_count && nums[i + 1] == 2) {
+               }
+           } else if (i + 4 < num_count && nums[i + 1] == 2) {
                 // 24-bit background
                 web_state.bg_r = nums[i + 2];
                 web_state.bg_g = nums[i + 3];
                 web_state.bg_b = nums[i + 4];
                 i += 4;
-            }
+           }
             break;
-        }
-    }
+       }
+   }
 }
 
 // Output a single text segment (no ANSI codes)
@@ -1009,42 +1011,42 @@ static void web_write_str(const char* str, size_t len)
             // Output any pending text before the escape sequence
             if (i > text_start) {
                 web_output_text(str + text_start, i - text_start);
-            }
+           }
 
             // Find end of CSI sequence (ends with letter)
             size_t seq_start = i + 2; // After ESC[
             size_t seq_end = seq_start;
             while (seq_end < len && !((str[seq_end] >= 'A' && str[seq_end] <= 'Z') || (str[seq_end] >= 'a' && str[seq_end] <= 'z'))) {
                 seq_end++;
-            }
+           }
 
             if (seq_end < len) {
                 char cmd = str[seq_end];
                 if (cmd == 'm') {
                     // SGR sequence - parse color/style codes
                     parse_ansi_sgr(str + seq_start, seq_end - seq_start);
-                }
+               }
                 // Skip other CSI sequences (cursor movement, etc.)
                 i = seq_end + 1;
                 text_start = i;
-            } else {
+           } else {
                 // Incomplete sequence, output as-is
                 i++;
-            }
-        } else {
+           }
+       } else {
             i++;
-        }
-    }
+       }
+   }
 
     // Output remaining text
     if (i > text_start) {
         web_output_text(str + text_start, i - text_start);
-    }
+   }
 }
 
 static void web_write_char(char c)
 {
-    char buf[2] = { c, '\0' };
+    char buf[2] = { c, '\0'};
     js_draw_text(web_state.cursor_col, web_state.cursor_row, buf, 1,
         web_state.fg_r, web_state.fg_g, web_state.fg_b,
         web_state.bg_r, web_state.bg_g, web_state.bg_b,
@@ -1060,16 +1062,16 @@ static void web_repeat_char(char c, int32_t n)
     if (c == ' ') {
         js_clear_rect(web_state.cursor_col, web_state.cursor_row, n, 1,
             web_state.bg_r, web_state.bg_g, web_state.bg_b);
-    } else {
+   } else {
         for (int32_t i = 0; i < n; i++) {
-            char buf[2] = { c, '\0' };
+            char buf[2] = { c, '\0'};
             js_draw_text(web_state.cursor_col + i, web_state.cursor_row, buf, 1,
                 web_state.fg_r, web_state.fg_g, web_state.fg_b,
                 web_state.bg_r, web_state.bg_g, web_state.bg_b,
                 web_state.bold, web_state.italic, web_state.dim,
                 web_state.underline, web_state.strikethrough);
-        }
-    }
+       }
+   }
     web_state.cursor_col += n;
 }
 
@@ -1078,7 +1080,7 @@ static void web_write_scaled(const char* str, size_t len, int32_t scale)
     if (scale <= 1) {
         web_write_str(str, len);
         return;
-    }
+   }
 
     // Make null-terminated copy
     char* buf = malloc(len + 1);
@@ -1107,7 +1109,7 @@ static void web_write_scaled_frac(const char* str, size_t len, int32_t scale, in
     if (scale <= 1 && (num == 0 || denom == 0)) {
         web_write_str(str, len);
         return;
-    }
+   }
 
     // Make null-terminated copy
     char* buf = malloc(len + 1);
@@ -1123,7 +1125,7 @@ static void web_write_scaled_frac(const char* str, size_t len, int32_t scale, in
     double font_scale = (double)scale;
     if (num > 0 && denom > 0 && num < denom) {
         font_scale = (double)scale * (double)num / (double)denom;
-    }
+   }
 
     js_draw_text_scaled_frac(web_state.cursor_col, web_state.cursor_row, buf,
         scale, font_scale,
@@ -1143,7 +1145,7 @@ static void web_flush(void)
     if (web_state.cursor_visible) {
         js_draw_cursor(web_state.draw_cursor_col, web_state.draw_cursor_row,
             web_state.fg_r, web_state.fg_g, web_state.fg_b);
-    }
+   }
 }
 
 static void web_sync_begin(void)
@@ -1156,9 +1158,10 @@ static void web_sync_end(void)
     // No-op
 }
 
+// clang-format off
 static void web_set_title(const char* title)
 {
-    EM_ASM({ document.title = UTF8ToString($0); }, title);
+    EM_ASM({ document.title = UTF8ToString($0);}, title);
 }
 
 static void web_link_begin(const char* url)
@@ -1177,7 +1180,7 @@ static int32_t web_read_key(void)
 
     if (web_state.key_queue_head == web_state.key_queue_tail) {
         return DAWN_KEY_NONE;
-    }
+   }
 
     int32_t key = web_state.key_queue[web_state.key_queue_head];
     web_state.key_queue_head = (web_state.key_queue_head + 1) % 64;
@@ -1199,7 +1202,7 @@ static bool web_check_resize(void)
     if (web_state.resize_needed) {
         web_state.resize_needed = false;
         return true;
-    }
+   }
     return false;
 }
 
@@ -1238,7 +1241,7 @@ static char* web_clipboard_paste(size_t* out_len)
     char* text = js_clipboard_paste();
     if (text && out_len) {
         *out_len = strlen(text);
-    }
+   }
     return text;
 }
 
@@ -1260,16 +1263,16 @@ static bool web_mkdir_p(const char* path)
         try
         {
             FS.mkdir(current);
-        }
+       }
         catch(e)
         {
             // EEXIST (errno 20) is fine - directory already exists
-            if (e.errno != = 20) {
+            if (e.errno !== 20) {
                 // Only log unexpected errors
                 // console.error('mkdir_p error:', e);
-            }
-        }
-            }
+           }
+       }
+           }
             return 1;
 }
 catch(e)
@@ -1299,7 +1302,7 @@ static char* web_read_file(const char* path, size_t* out_len)
     char *result = (char*)EM_ASM_PTR({
         try {
             const path = UTF8ToString($0);
-            const data = FS.readFile(path, { encoding: 'utf8' });
+            const data = FS.readFile(path, { encoding: 'utf8'});
             const len = lengthBytesUTF8(data) + 1;
             const ptr = _malloc(len);
             stringToUTF8(data, ptr, len);
@@ -1327,7 +1330,7 @@ static bool web_write_file(const char* path, const char* data, size_t len)
     if (last_slash && last_slash != parent) {
         *last_slash = '\0';
         web_mkdir_p(parent);
-    }
+   }
 
     bool success = EM_ASM_INT({
         try {
@@ -1381,7 +1384,7 @@ for (int32_t i = 0; i < count; i++) {
             const len = lengthBytesUTF8(name) + 1;
             const ptr = _malloc(len);
             stringToUTF8(name, ptr, len);
-            return ptr; }, i);
+            return ptr;}, i);
 }
 
 *out_count = count;
@@ -1430,14 +1433,14 @@ static void web_reveal_in_finder(const char* path)
     EM_ASM({
         const path = UTF8ToString($0);
         // For web, we might download the file instead
-        console.log('Reveal in finder:', path); }, path);
+        console.log('Reveal in finder:', path);}, path);
 }
 
 static int64_t web_clock(DawnClock kind)
 {
     if (kind == DAWN_CLOCK_MS) {
         return (int64_t)js_time_now_ms_double();
-    }
+   }
     return (int64_t)js_time_now_double();
 }
 
@@ -1470,7 +1473,7 @@ static void web_get_local_time_from(DawnTime* out, int64_t timestamp)
     if (!t) {
         memset(out, 0, sizeof(*out));
         return;
-    }
+   }
     out->year = t->tm_year + 1900;
     out->mon = t->tm_mon;
     out->mday = t->tm_mday;
@@ -1535,7 +1538,7 @@ static void web_image_clear_all(void)
 {
     EM_ASM({
         window.dawnImages = {};
-    });
+   });
 }
 
 static void web_image_mask_region(int32_t col, int32_t row, int32_t cols, int32_t rows, DawnColor bg)
@@ -1554,21 +1557,21 @@ static bool web_image_resolve_path(const char* raw_path, const char* base_dir,
         strncpy(out, raw_path, out_size - 1);
         out[out_size - 1] = '\0';
         return true;
-    }
+   }
 
     // Handle absolute paths
     if (raw_path[0] == '/') {
         strncpy(out, raw_path, out_size - 1);
         out[out_size - 1] = '\0';
         return true;
-    }
+   }
 
     // Relative path
     if (base_dir) {
         snprintf(out, out_size, "%s/%s", base_dir, raw_path);
-    } else {
+   } else {
         snprintf(out, out_size, "/dawn/%s", raw_path);
-    }
+   }
 
     return true;
 }
@@ -1584,12 +1587,12 @@ static int32_t web_image_calc_rows(int32_t pixel_width, int32_t pixel_height, in
     float scale = 1.0f;
     if (pixel_width > max_width_px) {
         scale = (float)max_width_px / pixel_width;
-    }
+   }
 
     int32_t scaled_height = (int32_t)(pixel_height * scale);
     if (max_rows > 0 && scaled_height > max_height_px) {
         scaled_height = max_height_px;
-    }
+   }
 
     return (scaled_height + CELL_HEIGHT - 1) / CELL_HEIGHT;
 }
@@ -1600,8 +1603,9 @@ static void web_image_invalidate(const char* path)
         const path = UTF8ToString($0);
         if (window.dawnImages) {
             delete window.dawnImages[path];
-        } }, path);
+       }}, path);
 }
+// clang-format on
 
 const DawnBackend dawn_backend_web = {
     .name = "web",

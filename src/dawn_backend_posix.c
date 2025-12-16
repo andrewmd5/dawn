@@ -1403,7 +1403,30 @@ static int32_t posix_read_key(void)
         return DAWN_KEY_NONE;
     }
 
-    return (uint8_t)c;
+    uint8_t first = (uint8_t)c;
+    if (first < 0x80) {
+        return first;
+    }
+    int32_t expected = utf8proc_utf8class[first];
+    if (expected < 2 || expected > 4) {
+        return DAWN_KEY_NONE;
+    }
+    uint8_t buf[4];
+    buf[0] = first;
+    for (int32_t i = 1; i < expected; i++) {
+        if (read(STDIN_FILENO, &buf[i], 1) != 1) {
+            return DAWN_KEY_NONE;
+        }
+        if ((buf[i] & 0xC0) != 0x80) {
+            return DAWN_KEY_NONE;
+        }
+    }
+    utf8proc_int32_t codepoint;
+    if (utf8proc_iterate(buf, expected, &codepoint) != expected) {
+        return DAWN_KEY_NONE;
+    }
+
+    return codepoint;
 }
 
 static int32_t posix_get_last_mouse_col(void)
