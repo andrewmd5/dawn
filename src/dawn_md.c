@@ -882,7 +882,13 @@ bool md_check_link(const GapBuffer *gb, size_t pos, MdMatch2 *result) {
     // Find closing ]
     size_t p = pos + 1;
     size_t t_start = p;
-    while (p < len && gap_at(gb, p) != ']' && gap_at(gb, p) != '\n') p++;
+    int bracket_depth = 1;
+    while (p < len && bracket_depth > 0 && gap_at(gb, p) != '\n') {
+        char ch = gap_at(gb, p);
+        if (ch == '[') bracket_depth++;
+        else if (ch == ']') bracket_depth--;
+        if (bracket_depth > 0) p++;
+    }
     if (p >= len || gap_at(gb, p) != ']') return false;
     size_t t_len = p - t_start;
 

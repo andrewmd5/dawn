@@ -977,6 +977,19 @@ static void posix_set_title(const char *title) {
     }
 }
 
+static void posix_link_begin(const char *url) {
+    // OSC 8 hyperlink: ESC ] 8 ; ; url ST
+    if (url && *url) {
+        buf_append_str("\x1b]8;;");
+        buf_append_str(url);
+        buf_append_str("\x1b\\");
+    }
+}
+
+static void posix_link_end(void) {
+    // Close OSC 8 hyperlink
+    buf_append_str("\x1b]8;;\x1b\\");
+}
 
 static void drain_escape_sequence(void) {
     char c;
@@ -2180,6 +2193,8 @@ const DawnBackend dawn_backend_posix = {
     .sync_begin = posix_sync_begin,
     .sync_end = posix_sync_end,
     .set_title = posix_set_title,
+    .link_begin = posix_link_begin,
+    .link_end = posix_link_end,
 
     // Input
     .read_key = posix_read_key,

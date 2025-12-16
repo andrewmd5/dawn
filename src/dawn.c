@@ -1645,10 +1645,11 @@ static bool render_code_block_element(const RenderCtx *ctx, RenderState *rs, con
     track_cursor(ctx, rs);
 
     bool first_line = true;
-    
+    int32_t label_width = lang[0] ? utf8_display_width(lang, strlen(lang)) + 1 : 0;  // +1 for trailing space
+
     while (*p || first_line) {
         screen_row = VROW_TO_SCREEN(&ctx->L, rs->virtual_row, app.scroll_y);
-        
+
         // Early exit if past visible area (but not in print mode)
         if (!ctx->is_print_mode && screen_row > ctx->max_row) break;
         
@@ -1717,8 +1718,9 @@ static bool render_code_block_element(const RenderCtx *ctx, RenderState *rs, con
                 }
             }
             
-            // Check if character fits on line
-            if (vis_col + char_width > ctx->L.text_width) break;
+            // Check if character fits on line (first line has less space due to label)
+            int32_t line_limit = first_line ? ctx->L.text_width - label_width : ctx->L.text_width;
+            if (vis_col + char_width > line_limit) break;
 
             // Output character
             if (visible) {
@@ -1731,24 +1733,23 @@ static bool render_code_block_element(const RenderCtx *ctx, RenderState *rs, con
         
         if (visible) {
             // Pad remaining space and optionally render language label
-            int32_t label_len = (first_line && lang[0]) ? (int32_t)strlen(lang) : 0;
-            int32_t content_end = ctx->L.text_width - (label_len ? label_len + 1 : 0);
-            
+            int32_t line_limit = first_line ? ctx->L.text_width - label_width : ctx->L.text_width;
+
             // Fill gap between code content and label (or end of line)
-            if (vis_col < content_end) {
-                out_spaces(content_end - vis_col);
+            if (vis_col < line_limit) {
+                out_spaces(line_limit - vis_col);
             }
-            
+
             // Render language label on first line (right-aligned)
-            if (label_len > 0) {
+            if (first_line && lang[0]) {
                 set_fg(get_dim());
                 out_str(lang);
                 out_char(' ');
             } else if (ctx->is_print_mode && vis_col < ctx->L.text_width) {
                 // Print mode without label - fill to line end
-                out_spaces(ctx->L.text_width - content_end);
+                out_spaces(ctx->L.text_width - line_limit);
             }
-            
+
             reset_attrs();
             set_bg(get_bg());
         }
@@ -2482,6 +2483,7 @@ static bool render_inline_math(const RenderCtx *ctx, RenderState *rs, const Inli
 static bool render_link(const RenderCtx *ctx, RenderState *rs, const InlineRun *run) {
     size_t link_total = run->byte_end - run->byte_start;
     int32_t screen_row = VROW_TO_SCREEN(&ctx->L, rs->virtual_row, app.scroll_y);
+    int32_t text_scale = GET_LINE_SCALE(rs->line_style);
 
     if (CURSOR_IN(rs->pos, rs->pos + link_total)) {
         render_cursor_in_element(ctx, rs, link_total);
@@ -2494,19 +2496,53 @@ static bool render_link(const RenderCtx *ctx, RenderState *rs, const InlineRun *
     url[ulen] = '\0';
     rs->pos += link_total;
 
-    if (IS_ROW_VISIBLE(&ctx->L, screen_row, ctx->max_row)) {
-        char link_seq[1100];
-        snprintf(link_seq, sizeof(link_seq), "\x1b]8;;%s\x1b\\", url);
-        out_str(link_seq);
-        set_underline(UNDERLINE_STYLE_SINGLE);
-        set_fg(get_accent());
+    size_t link_pos = run->data.link.text_start;
+    size_t link_end = run->data.link.text_start + run->data.link.text_len;
+    bool in_code = false;
+    bool link_started = false;
 
-        size_t link_pos = run->data.link.text_start;
-        size_t link_end = run->data.link.text_start + run->data.link.text_len;
-        int32_t link_display_width = 0;
-        bool in_code = false;
-        
-        while (link_pos < link_end) {
+    while (link_pos < link_end) {
+        screen_row = VROW_TO_SCREEN(&ctx->L, rs->virtual_row, app.scroll_y);
+        int32_t available_width = ctx->L.text_width / text_scale;
+
+        // Check if we need to wrap before outputting next char
+        if (rs->col_width >= available_width) {
+            // Close hyperlink before wrapping
+            if (link_started && IS_ROW_VISIBLE(&ctx->L, screen_row, ctx->max_row)) {
+                clear_underline();
+                reset_attrs();
+                DAWN_BACKEND(app)->link_end();
+                set_bg(get_bg());
+            }
+            link_started = false;
+
+            // Wrap to next line
+            rs->virtual_row += text_scale;
+            rs->col_width = 0;
+            screen_row = VROW_TO_SCREEN(&ctx->L, rs->virtual_row, app.scroll_y);
+
+            // Skip leading spaces on wrapped line
+            while (link_pos < link_end && gap_at(&app.text, link_pos) == ' ') {
+                link_pos++;
+            }
+            if (link_pos >= link_end) break;
+
+            // Move cursor to start of new line
+            if (IS_ROW_VISIBLE(&ctx->L, screen_row, ctx->max_row)) {
+                move_to(screen_row, ctx->L.margin + 1);
+            }
+        }
+
+        if (IS_ROW_VISIBLE(&ctx->L, screen_row, ctx->max_row)) {
+            // Start/restart hyperlink on this line
+            if (!link_started) {
+                DAWN_BACKEND(app)->link_begin(url);
+                set_underline(UNDERLINE_STYLE_SINGLE);
+                set_fg(get_accent());
+                if (in_code) set_dim(true);
+                link_started = true;
+            }
+
             char ch = gap_at(&app.text, link_pos);
             if (ch == '`') {
                 in_code = !in_code;
@@ -2514,25 +2550,37 @@ static bool render_link(const RenderCtx *ctx, RenderState *rs, const InlineRun *
                 set_dim(in_code);
                 continue;
             }
-            
+
             size_t next_pos;
             int32_t gw = grapheme_width_next(&app.text, link_pos, &next_pos);
             for (size_t j = link_pos; j < next_pos && j < link_end; j++) {
                 out_char(gap_at(&app.text, j));
             }
-            link_display_width += gw;
+            rs->col_width += gw;
+            link_pos = next_pos;
+        } else {
+            char ch = gap_at(&app.text, link_pos);
+            if (ch == '`') {
+                in_code = !in_code;
+                link_pos++;
+                continue;
+            }
+
+            size_t next_pos;
+            int32_t gw = grapheme_width_next(&app.text, link_pos, &next_pos);
+            rs->col_width += gw;
             link_pos = next_pos;
         }
-        
+    }
+
+    // Close hyperlink at end
+    screen_row = VROW_TO_SCREEN(&ctx->L, rs->virtual_row, app.scroll_y);
+    if (link_started && IS_ROW_VISIBLE(&ctx->L, screen_row, ctx->max_row)) {
         clear_underline();
         reset_attrs();
-        out_str("\x1b]8;;\x1b\\");
+        DAWN_BACKEND(app)->link_end();
         set_bg(get_bg());
         set_fg(get_fg());
-        rs->col_width += link_display_width;
-    } else {
-        rs->col_width += gap_display_width(&app.text, run->data.link.text_start,
-                                           run->data.link.text_start + run->data.link.text_len);
     }
     return true;
 }
@@ -4835,9 +4883,14 @@ static void render_block(const RenderCtx *ctx, RenderState *rs, const Block *blo
                                 render_inline_math(ctx, rs, run);
                                 continue;
 
-                            case RUN_LINK:
+                            case RUN_LINK: {
                                 render_link(ctx, rs, run);
+                                // Recalculate seg_end - link may have wrapped internally
+                                int32_t avail = (ctx->L.text_width - rs->col_width) / text_scale;
+                                if (avail < 1) avail = 1;
+                                seg_end = gap_find_wrap_point(&app.text, rs->pos, line_end, avail, &seg_width);
                                 continue;
+                            }
 
                             case RUN_FOOTNOTE_REF:
                                 render_footnote_ref(ctx, rs, run);

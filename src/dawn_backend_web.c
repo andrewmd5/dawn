@@ -1001,6 +1001,15 @@ static void web_set_title(const char *title) {
     }, title);
 }
 
+static void web_link_begin(const char *url) {
+    // TODO: Track current link URL for click handling
+    (void)url;
+}
+
+static void web_link_end(void) {
+    // TODO: Clear current link URL
+}
+
 static int32_t web_read_key(void) {
     
     if (web_state.key_queue_head == web_state.key_queue_tail) {
@@ -1416,6 +1425,8 @@ const DawnBackend dawn_backend_web = {
     .sync_begin = web_sync_begin,
     .sync_end = web_sync_end,
     .set_title = web_set_title,
+    .link_begin = web_link_begin,
+    .link_end = web_link_end,
 
     // Input
     .read_key = web_read_key,

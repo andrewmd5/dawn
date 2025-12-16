@@ -144,6 +144,8 @@ typedef struct DawnBackend {
     void (*sync_begin)(void);
     void (*sync_end)(void);
     void (*set_title)(const char *title);
+    void (*link_begin)(const char *url);
+    void (*link_end)(void);
 
     // Input
     int32_t (*read_key)(void);
