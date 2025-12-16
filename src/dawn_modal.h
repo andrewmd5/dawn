@@ -232,6 +232,102 @@
 
 // #endregion
 
+// #region Frontmatter Editor Macros
+
+//! Render a field key label with "key: " format
+//! @param key The field key string
+//! @param is_active Whether this field is currently selected
+#define FM_KEY_LABEL(key, is_active) \
+    do { \
+        set_fg((is_active) ? get_accent() : get_dim()); \
+        platform_write_str(key); \
+        platform_write_str(": "); \
+        set_fg(get_fg()); \
+    } while(0)
+
+//! Render a boolean field value with toggle hint
+//! @param value The boolean value
+//! @param is_active Whether this field is currently selected
+//! @param cursor_row Pointer to cursor row variable
+//! @param cursor_col Pointer to cursor col variable
+//! @param val_start Column where value starts
+//! @param row Current row
+#define FM_BOOL_VALUE(value, is_active, cursor_row, cursor_col, val_start, row) \
+    do { \
+        platform_write_str((value) ? "true" : "false"); \
+        if (is_active) { \
+            set_fg(get_dim()); \
+            platform_write_str("  [space:toggle]"); \
+            (cursor_row) = (row); \
+            (cursor_col) = (val_start); \
+        } \
+    } while(0)
+
+//! Render a datetime part with highlighting
+//! @param buf Char buffer for snprintf
+//! @param fmt Format string (e.g., "%04d", "%02d")
+//! @param value The numeric value
+//! @param is_active Whether this field is active
+//! @param part_idx The part index (0-5)
+//! @param current_part The currently selected part
+#define FM_DT_PART(buf, fmt, value, is_active, part_idx, current_part) \
+    do { \
+        set_fg(((is_active) && (part_idx) == (current_part)) ? get_accent() : get_fg()); \
+        snprintf((buf), sizeof(buf), (fmt), (value)); \
+        platform_write_str(buf); \
+    } while(0)
+
+//! Render a datetime separator (-, T, :, .)
+//! @param sep The separator string
+#define FM_DT_SEP(sep) \
+    do { \
+        set_fg(get_dim()); \
+        platform_write_str(sep); \
+    } while(0)
+
+//! Set cursor position for a field
+//! @param cursor_row Cursor row variable
+//! @param cursor_col Cursor col variable
+//! @param r Row value
+//! @param c Column value
+#define FM_CURSOR_SET(cursor_row, cursor_col, r, c) \
+    do { \
+        (cursor_row) = (r); \
+        (cursor_col) = (c); \
+    } while(0)
+
+//! Render a dim hint text
+//! @param text The hint text
+#define FM_HINT(text) \
+    do { \
+        set_fg(get_dim()); \
+        platform_write_str(text); \
+    } while(0)
+
+//! Find cursor line using main editor logic
+//! @param cursor The cursor position
+//! @param wr Pointer to WrapResult
+//! @param len Total string length
+//! @param out_line Output variable for line index
+#define FM_FIND_CURSOR_LINE(cursor, wr, len, out_line) \
+    do { \
+        (out_line) = 0; \
+        for (int32_t _ln = 0; _ln < (wr)->count; _ln++) { \
+            WrapLine *_wl = &(wr)->lines[_ln]; \
+            if ((cursor) >= _wl->start && (cursor) <= _wl->end) { \
+                (out_line) = _ln; \
+                break; \
+            } \
+            if ((cursor) < _wl->start) { (out_line) = _ln > 0 ? _ln - 1 : 0; break; } \
+            (out_line) = _ln; \
+        } \
+        if ((cursor) >= (len) && (wr)->count > 0) { \
+            (out_line) = (wr)->count - 1; \
+        } \
+    } while(0)
+
+// #endregion
+
 // #region Internal Helpers (implemented in dawn_modal.c)
 
 void _modal_write_str(const char *str);

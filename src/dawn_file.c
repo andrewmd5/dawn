@@ -61,11 +61,12 @@ void save_session(void) {
         fm_set_string(fm, "author", get_username());
     }
 
-    // Always update date
+    // Always update date with ISO 8601 format
     DawnTime lt;
     DAWN_BACKEND(app)->localtime(&lt);
-    char date_buf[16];
-    snprintf(date_buf, sizeof(date_buf), "%04d-%02d-%02d", lt.year, lt.mon + 1, lt.mday);
+    char date_buf[32];
+    snprintf(date_buf, sizeof(date_buf), "%04d-%02d-%02dT%02d:%02d:%02dZ",
+             lt.year, lt.mon + 1, lt.mday, lt.hour, lt.min, lt.sec);
     fm_set_string(fm, "date", date_buf);
 
     // Serialize frontmatter

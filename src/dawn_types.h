@@ -92,7 +92,7 @@ DAWN_ENUM(uint8_t) {
     MODE_HISTORY,       //!< Document history browser
     MODE_STYLE,         //!< Style selection (unused)
     MODE_FINISHED,      //!< Timer completed screen
-    MODE_TITLE_EDIT,    //!< Document title editor (modal)
+    MODE_FM_EDIT,       //!< Frontmatter editor (modal)
     MODE_HELP,          //!< Keyboard shortcuts help
     MODE_BLOCK_EDIT,    //!< Block editor (modal) - images, etc.
     MODE_TOC,           //!< Table of contents navigation (modal)
@@ -134,6 +134,102 @@ typedef struct {
 
 // #endregion
 
+// #region Frontmatter Edit Types
+
+#define FM_EDIT_MAX_FIELDS 24
+#define FM_EDIT_VALUE_SIZE 512
+#define FM_EDIT_MAX_LIST_ITEMS 32
+
+//! Field kind for frontmatter editor
+DAWN_ENUM(uint8_t) {
+    FM_FIELD_STRING,    //!< Plain text
+    FM_FIELD_BOOL,      //!< Boolean toggle
+    FM_FIELD_DATETIME,  //!< ISO 8601 datetime
+    FM_FIELD_LIST       //!< Sequence/array
+} FmFieldKind;
+
+//! String field data
+typedef struct {
+    char value[FM_EDIT_VALUE_SIZE];
+    size_t len;
+    size_t cursor;
+    size_t scroll;        //!< Horizontal scroll offset for long strings
+} FmFieldString;
+
+//! Boolean field data
+typedef struct {
+    bool value;
+} FmFieldBool;
+
+//! Datetime field data (ISO 8601: 2021-09-21T15:53:30.684Z)
+typedef struct {
+    DawnDate d;           //!< Date/time data
+    int32_t part;         //!< Active part: 0=year,1=month,2=day,3=hour,4=min,5=sec
+} FmFieldDatetime;
+
+//! List/sequence field data
+typedef struct {
+    char items[FM_EDIT_MAX_LIST_ITEMS][FM_EDIT_VALUE_SIZE];
+    size_t item_lens[FM_EDIT_MAX_LIST_ITEMS];
+    int32_t count;
+    int32_t selected;     //!< Selected item index
+    size_t cursor;        //!< Cursor in selected item
+    bool flow_style;      //!< true for ["a", "b"], false for block style
+} FmFieldList;
+
+//! A single frontmatter field being edited
+typedef struct {
+    char key[64];
+    FmFieldKind kind;
+    union {
+        FmFieldString str;
+        FmFieldBool boolean;
+        FmFieldDatetime datetime;
+        FmFieldList list;
+    };
+} FmEditField;
+
+//! Frontmatter editor state
+typedef struct {
+    FmEditField fields[FM_EDIT_MAX_FIELDS];
+    int32_t field_count;
+    int32_t current_field;
+    bool adding_field;        //!< Adding new field
+    char new_key[64];
+    size_t new_key_len;
+    bool adding_list_item;    //!< Adding item to list
+} FmEditState;
+
+// #endregion
+
+// #region Block Edit Types
+
+//! Image block edit fields
+typedef struct {
+    char alt[256];
+    char title[256];
+    char width[16];
+    char height[16];
+    size_t alt_len;
+    size_t title_len;
+    size_t width_len;
+    size_t height_len;
+    bool width_pct;
+    bool height_pct;
+} BlockEditImage;
+
+//! Block editor state
+typedef struct {
+    int8_t type;          //!< BlockType being edited
+    size_t pos;           //!< Position of block in text
+    size_t len;           //!< Total length of block syntax
+    int32_t field;        //!< Current field index
+    union {
+        BlockEditImage image;
+    };
+} BlockEditState;
+
+// #endregion
 
 // #region Application State
 
@@ -182,33 +278,10 @@ typedef struct {
     // Current Session
     char *session_path;     //!< Path to current document
     void *frontmatter;      //!< Frontmatter* - YAML frontmatter data
-    char title_edit_buf[256]; //!< Title edit buffer
-    size_t title_edit_len;    //!< Title edit length
-    size_t title_edit_cursor; //!< Title edit cursor
 
-    // Block Edit State
-    struct {
-        int8_t type;          //!< BlockType being edited
-        size_t pos;           //!< Position of block in text
-        size_t len;           //!< Total length of block syntax
-        int32_t field;        //!< Current field index
-        union {
-            struct {
-                char alt[256];
-                char title[256];
-                char width[16];
-                char height[16];
-                size_t alt_len;
-                size_t title_len;
-                size_t width_len;
-                size_t height_len;
-                bool width_pct;
-                bool height_pct;
-            } image;
-            // Future: struct { ... } code;
-            // Future: struct { ... } link;
-        };
-    } block_edit;
+    // Modal editors
+    FmEditState fm_edit;
+    BlockEditState block_edit;
 
     // AI Chat
     bool ai_open;           //!< AI panel visible

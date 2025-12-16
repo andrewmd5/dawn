@@ -10,6 +10,7 @@
 #include "dawn_utils.h"
 #include "dawn_toc.h"
 #include "dawn_search.h"
+#include "dawn_wrap.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -413,11 +414,36 @@ void render_finished(void) {
     #endif
 }
 
-void render_title_edit(void) {
-    int32_t box_width = 50;
-    int32_t box_height = 7;
-    int32_t top, left;
+void render_fm_edit(void) {
+    int32_t box_width = 70;
+    if (box_width > app.cols - 4) box_width = app.cols - 4;
+    int32_t content_width = box_width - 4;
 
+    // Calculate actual row count including wrapped lines for current string field
+    int32_t field_rows = 0;
+    for (int32_t i = 0; i < app.fm_edit.field_count; i++) {
+        FmEditField *field = &app.fm_edit.fields[i];
+        bool is_current = (i == app.fm_edit.current_field);
+
+        if (is_current && field->kind == FM_FIELD_STRING && field->str.len > 0) {
+            int32_t wrap_width = content_width - (int32_t)strlen(field->key) - 3;
+            if (wrap_width < 10) wrap_width = 10;
+            WrapResult wr;
+            wrap_init(&wr);
+            wrap_string(field->str.value, field->str.len, wrap_width, &wr);
+            field_rows += wr.count > 0 ? wr.count : 1;
+            wrap_free(&wr);
+        } else {
+            field_rows++;
+        }
+    }
+    if (app.fm_edit.adding_field) field_rows++;
+    if (field_rows < 1) field_rows = 1;
+
+    int32_t box_height = 6 + field_rows;
+    if (box_height > app.rows - 4) box_height = app.rows - 4;
+
+    int32_t top, left;
     render_popup_box(box_width, box_height, &top, &left);
 
     int32_t content_left = left + 2;
@@ -425,28 +451,163 @@ void render_title_edit(void) {
 
     set_bg(get_modal_bg());
 
-    // Title
     move_to(content_top, content_left);
     set_fg(get_dim());
-    platform_write_str("Set Title");
+    platform_write_str("Edit Frontmatter");
 
-    // Input field
-    int32_t input_row = content_top + 2;
-    move_to(input_row, content_left);
-    set_fg(get_accent());
-    platform_write_str("> ");
-    set_fg(get_fg());
-    for (size_t i = 0; i < app.title_edit_len; i++) {
-        platform_write_char(app.title_edit_buf[i]);
+    int32_t row = content_top + 2;
+    int32_t cursor_row = row;
+    int32_t cursor_col = content_left;
+
+    for (int32_t i = 0; i < app.fm_edit.field_count && row < top + box_height - 3; i++) {
+        FmEditField *field = &app.fm_edit.fields[i];
+        bool is_current = (i == app.fm_edit.current_field);
+
+        move_to(row, content_left);
+        FM_KEY_LABEL(field->key, is_current);
+
+        int32_t value_start = content_left + (int32_t)strlen(field->key) + 2;
+        int32_t max_val_width = content_width - (int32_t)strlen(field->key) - 3;
+
+        switch (field->kind) {
+            case FM_FIELD_BOOL:
+                FM_BOOL_VALUE(field->boolean.value, is_current, cursor_row, cursor_col, value_start, row);
+                break;
+
+            case FM_FIELD_DATETIME: {
+                char buf[8];
+                FmFieldDatetime *dt = &field->datetime;
+                int32_t p = dt->part;
+
+                FM_DT_PART(buf, "%04d", dt->d.year, is_current, 0, p);
+                FM_DT_SEP("-");
+                FM_DT_PART(buf, "%02d", dt->d.mon, is_current, 1, p);
+                FM_DT_SEP("-");
+                FM_DT_PART(buf, "%02d", dt->d.mday, is_current, 2, p);
+
+                if (dt->d.has_time) {
+                    FM_DT_SEP("T");
+                    FM_DT_PART(buf, "%02d", dt->d.hour, is_current, 3, p);
+                    FM_DT_SEP(":");
+                    FM_DT_PART(buf, "%02d", dt->d.min, is_current, 4, p);
+                    FM_DT_SEP(":");
+                    FM_DT_PART(buf, "%02d", dt->d.sec, is_current, 5, p);
+
+                    if (dt->d.ms > 0) {
+                        FM_DT_SEP(".");
+                        set_fg(get_fg());
+                        snprintf(buf, sizeof(buf), "%03d", dt->d.ms);
+                        platform_write_str(buf);
+                    }
+                    if (dt->d.has_tz) FM_HINT(dt->d.tz);
+                }
+
+                if (is_current) {
+                    FM_HINT("  [</>:part +/-:adj]");
+                    int32_t offsets[] = {0, 5, 8, 11, 14, 17};
+                    FM_CURSOR_SET(cursor_row, cursor_col, row, value_start + offsets[p < 6 ? p : 0]);
+                }
+                break;
+            }
+
+            case FM_FIELD_LIST: {
+                FmFieldList *lst = &field->list;
+                int32_t col = value_start;
+                platform_write_str("["); col++;
+                for (int32_t j = 0; j < lst->count; j++) {
+                    if (j > 0) { platform_write_str(", "); col += 2; }
+                    bool item_sel = (is_current && j == lst->selected);
+                    if (item_sel) set_fg(get_accent());
+                    platform_write_str("\""); col++;
+                    int32_t item_start_col = col;
+                    for (size_t k = 0; k < lst->item_lens[j]; k++) {
+                        platform_write_char(lst->items[j][k]);
+                        col++;
+                    }
+                    platform_write_str("\""); col++;
+                    if (item_sel) {
+                        set_fg(get_fg());
+                        FM_CURSOR_SET(cursor_row, cursor_col, row, item_start_col + (int32_t)lst->cursor);
+                    }
+                }
+                platform_write_str("]");
+                if (is_current && lst->count == 0) {
+                    FM_CURSOR_SET(cursor_row, cursor_col, row, value_start + 1);
+                }
+                break;
+            }
+
+            case FM_FIELD_STRING:
+            default: {
+                int32_t wrap_width = max_val_width > 0 ? max_val_width : 10;
+                int32_t max_lines = top + box_height - 3 - row;
+                if (!is_current) max_lines = 1;
+
+                WrapResult wr;
+                wrap_init(&wr);
+                wrap_string(field->str.value, field->str.len, wrap_width, &wr);
+
+                int32_t first_value_row = row;
+                for (int32_t ln = 0; ln < wr.count && ln < max_lines; ln++) {
+                    if (ln > 0) {
+                        row++;
+                        move_to(row, value_start);
+                    }
+                    WrapLine *wl = &wr.lines[ln];
+                    for (size_t j = wl->start; j < wl->end; j++) {
+                        char c = field->str.value[j];
+                        if (c != '\n') platform_write_char(c);
+                    }
+                }
+                
+                if (is_current) {
+                    size_t cur = field->str.cursor;
+                    int32_t cursor_line;
+                    FM_FIND_CURSOR_LINE(cur, &wr, field->str.len, cursor_line);
+                    int32_t line_row = first_value_row + cursor_line;
+                    if (line_row <= first_value_row + max_lines - 1) {
+                        FM_CURSOR_SET(cursor_row, cursor_col, line_row,
+                            value_start + (int32_t)(cur - wr.lines[cursor_line].start));
+                    }
+                }
+
+                if (!is_current && wr.count > 1) FM_HINT("...");
+
+                wrap_free(&wr);
+                break;
+            }
+        }
+        row++;
     }
 
-    // Help text
-    move_to(content_top + 4, content_left);
-    set_fg(get_dim());
-    platform_write_str("enter:save  esc:cancel");
+    if (app.fm_edit.adding_field && row < top + box_height - 3) {
+        move_to(row, content_left);
+        set_fg(get_accent());
+        platform_write_str("+ ");
+        set_fg(get_fg());
+        for (size_t i = 0; i < app.fm_edit.new_key_len; i++) {
+            platform_write_char(app.fm_edit.new_key[i]);
+        }
+        platform_write_str(": ");
+        FM_CURSOR_SET(cursor_row, cursor_col, row, content_left + 2 + (int32_t)app.fm_edit.new_key_len);
+    }
 
-    // Position cursor
-    move_to(input_row, content_left + 2 + (int32_t)app.title_edit_cursor);
+    move_to(top + box_height - 2, content_left);
+    if (app.fm_edit.adding_field) {
+        FM_HINT("enter:add  esc:cancel");
+    } else if (app.fm_edit.current_field >= 0 && app.fm_edit.current_field < app.fm_edit.field_count) {
+        FmEditField *f = &app.fm_edit.fields[app.fm_edit.current_field];
+        switch (f->kind) {
+            case FM_FIELD_BOOL: FM_HINT("tab:next  space:toggle  enter:save  esc:cancel"); break;
+            case FM_FIELD_DATETIME: FM_HINT("tab:next  </>:part  +/-:adj  enter:save  esc:cancel"); break;
+            case FM_FIELD_LIST: FM_HINT("tab:next  ^N:add  ^D/bksp:del  ^←/→:item  enter:save  esc:cancel"); break;
+            default: FM_HINT("tab:next  +:add  ^S:save  esc:cancel"); break;
+        }
+    } else {
+        FM_HINT("tab:next  +:add field  enter:save  esc:cancel");
+    }
+
+    move_to(cursor_row, cursor_col);
     platform_set_cursor_visible(true);
 }
 

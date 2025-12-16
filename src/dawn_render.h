@@ -45,8 +45,8 @@ void render_history(void);
 //! Render the session completion screen
 void render_finished(void);
 
-//! Render the title editing screen
-void render_title_edit(void);
+//! Render the frontmatter editing screen
+void render_fm_edit(void);
 
 //! Render the block editing screen (images, etc.)
 void render_block_edit(void);

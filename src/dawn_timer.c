@@ -19,8 +19,10 @@ void timer_check(void) {
     if (app.timer_on && !app.timer_paused && app.timer_mins > 0 && timer_remaining() == 0) {
         app.timer_on = false;
         app.timer_done = true;
-        app.mode = MODE_FINISHED;
-        save_session();
+        if (app.mode == MODE_WRITING) {
+            app.mode = MODE_FINISHED;
+            save_session();
+        }
     }
 }
 

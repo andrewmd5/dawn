@@ -84,10 +84,21 @@ typedef struct {
 
 typedef struct {
     int16_t year;           //!< Year (e.g., 2024)
-    uint8_t mon, mday;      //!< Month (1-12), day (1-31)
+    uint8_t mon, mday;      //!< Month (0-11), day (1-31)
     uint8_t hour, min, sec; //!< Time components
     uint8_t wday;           //!< Day of week (0-6)
 } DawnTime;
+
+//! ISO 8601 date/time for parsing input strings
+typedef struct {
+    int16_t year;           //!< Year (e.g., 2024)
+    uint8_t mon, mday;      //!< Month (1-12), day (1-31)
+    uint8_t hour, min, sec; //!< Time components
+    uint16_t ms;            //!< Milliseconds (0-999)
+    bool has_time : 1;      //!< True if time component present
+    bool has_tz : 1;        //!< True if timezone present
+    char tz[8];             //!< Timezone: "Z" or "+05:30" etc
+} DawnDate;
 
 DAWN_ENUM(uint8_t) {
     DAWN_CLOCK_SEC,         //!< Seconds since epoch

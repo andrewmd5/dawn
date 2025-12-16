@@ -116,6 +116,34 @@ bool fm_set_bool(Frontmatter *fm, const char *key, bool value);
 //! @return true if key was removed, false if not found
 bool fm_remove(Frontmatter *fm, const char *key);
 
+//! Set a sequence (array) value in frontmatter
+//! @param fm Frontmatter handle
+//! @param key Key to set
+//! @param items Array of string items
+//! @param count Number of items
+//! @param flow_style true for ["a","b"] style, false for block style (- a)
+//! @return true on success
+bool fm_set_sequence(Frontmatter *fm, const char *key, const char **items, int count, bool flow_style);
+
+//! Get number of items in a sequence
+//! @param fm Frontmatter handle
+//! @param key Key to look up
+//! @return Number of items, or 0 if not a sequence
+int fm_get_sequence_count(const Frontmatter *fm, const char *key);
+
+//! Get an item from a sequence by index
+//! @param fm Frontmatter handle
+//! @param key Key to look up
+//! @param index Item index (0-based)
+//! @return String value (owned by frontmatter), or NULL if not found
+const char *fm_get_sequence_item(const Frontmatter *fm, const char *key, int index);
+
+//! Check if a sequence uses flow style (["a","b"]) vs block style (- a)
+//! @param fm Frontmatter handle
+//! @param key Key to look up
+//! @return true if flow style, false if block style or not a sequence
+bool fm_is_sequence_flow(const Frontmatter *fm, const char *key);
+
 // #endregion
 
 // #region Serialization

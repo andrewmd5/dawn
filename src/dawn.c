@@ -47,6 +47,7 @@
 #include "dawn_toc.h"
 #include "dawn_search.h"
 #include "dawn_block.h"
+#include "dawn_date.h"
 
 // Platform capability check macro
 #define HAS_CAP(cap) dawn_ctx_has(&app.ctx, cap)
@@ -726,7 +727,7 @@ static void update_title(void) {
             DAWN_BACKEND(app)->set_title("Dawn | Help");
             break;
         case MODE_WRITING:
-        case MODE_TITLE_EDIT:
+        case MODE_FM_EDIT:
         case MODE_BLOCK_EDIT:
         case MODE_TOC:
         case MODE_SEARCH: {
@@ -740,6 +741,136 @@ static void update_title(void) {
             break;
     }
 }
+
+// #region Frontmatter Editor Helpers
+
+//! Parse ISO 8601 datetime string into FmFieldDatetime
+static bool parse_datetime(const char *s, FmFieldDatetime *dt) {
+    if (!dawn_parse_iso_date(s, &dt->d)) return false;
+    dt->part = 0;
+    return true;
+}
+
+//! Callback for populating fm_edit from frontmatter iteration
+static bool fm_edit_populate_cb(const FmEntry *entry, void *user_data) {
+    Frontmatter *fm = (Frontmatter *)user_data;
+    if (app.fm_edit.field_count >= FM_EDIT_MAX_FIELDS) return false;
+
+    // Skip lastmod - it's auto-updated on save
+    if (strcmp(entry->key, "lastmod") == 0) return true;
+
+    FmEditField *field = &app.fm_edit.fields[app.fm_edit.field_count++];
+    memset(field, 0, sizeof(*field));
+    strncpy(field->key, entry->key, 63);
+    field->key[63] = '\0';
+
+    if (entry->type == FM_BOOL) {
+        field->kind = FM_FIELD_BOOL;
+        field->boolean.value = entry->value &&
+            (strcmp(entry->value, "true") == 0 || strcmp(entry->value, "yes") == 0);
+    } else if (entry->type == FM_SEQUENCE) {
+        field->kind = FM_FIELD_LIST;
+        field->list.count = 0;
+        field->list.selected = 0;
+        field->list.cursor = 0;
+        field->list.flow_style = fm_is_sequence_flow(fm, entry->key);
+        int count = fm_get_sequence_count(fm, entry->key);
+        for (int i = 0; i < count && field->list.count < FM_EDIT_MAX_LIST_ITEMS; i++) {
+            const char *item = fm_get_sequence_item(fm, entry->key, i);
+            if (item) {
+                size_t len = strlen(item);
+                if (len >= FM_EDIT_VALUE_SIZE) len = FM_EDIT_VALUE_SIZE - 1;
+                memcpy(field->list.items[field->list.count], item, len);
+                field->list.items[field->list.count][len] = '\0';
+                field->list.item_lens[field->list.count] = len;
+                field->list.count++;
+            }
+        }
+    } else if (entry->value && parse_datetime(entry->value, &field->datetime)) {
+        field->kind = FM_FIELD_DATETIME;
+    } else {
+        field->kind = FM_FIELD_STRING;
+        if (entry->value) {
+            strncpy(field->str.value, entry->value, FM_EDIT_VALUE_SIZE - 1);
+            field->str.value[FM_EDIT_VALUE_SIZE - 1] = '\0';
+            field->str.len = strlen(field->str.value);
+            field->str.cursor = 0;  // Start at beginning
+            field->str.scroll = 0;
+        }
+    }
+
+    return true;
+}
+
+//! Initialize fm_edit state from frontmatter
+static void fm_edit_init(void) {
+    memset(&app.fm_edit, 0, sizeof(app.fm_edit));
+
+    if (app.frontmatter) {
+        fm_iterate(app.frontmatter, fm_edit_populate_cb, app.frontmatter);
+    }
+
+    if (app.fm_edit.field_count == 0) {
+        FmEditField *field = &app.fm_edit.fields[0];
+        strcpy(field->key, "title");
+        field->kind = FM_FIELD_STRING;
+        field->str.value[0] = '\0';
+        field->str.len = 0;
+        field->str.cursor = 0;
+        app.fm_edit.field_count = 1;
+    }
+}
+
+//! Save fm_edit state back to frontmatter
+static void fm_edit_save(void) {
+    if (!app.frontmatter) app.frontmatter = fm_create();
+
+    for (int32_t i = 0; i < app.fm_edit.field_count; i++) {
+        FmEditField *field = &app.fm_edit.fields[i];
+
+        switch (field->kind) {
+            case FM_FIELD_BOOL:
+                fm_set_bool(app.frontmatter, field->key, field->boolean.value);
+                break;
+
+            case FM_FIELD_DATETIME: {
+                char buf[64];
+                dawn_format_iso_date(&field->datetime.d, buf, sizeof(buf));
+                fm_set_string(app.frontmatter, field->key, buf);
+                break;
+            }
+
+            case FM_FIELD_LIST: {
+                const char *items[FM_EDIT_MAX_LIST_ITEMS];
+                for (int32_t j = 0; j < field->list.count; j++) {
+                    field->list.items[j][field->list.item_lens[j]] = '\0';
+                    items[j] = field->list.items[j];
+                }
+                fm_set_sequence(app.frontmatter, field->key, items, field->list.count, field->list.flow_style);
+                break;
+            }
+
+            case FM_FIELD_STRING:
+            default:
+                field->str.value[field->str.len] = '\0';
+                if (field->str.len > 0) {
+                    fm_set_string(app.frontmatter, field->key, field->str.value);
+                } else {
+                    fm_remove(app.frontmatter, field->key);
+                }
+                break;
+        }
+    }
+
+    // Auto-update lastmod with current ISO 8601 datetime
+    DawnTime lt;
+    DAWN_BACKEND(app)->localtime(&lt);
+    char lastmod_buf[32];
+    dawn_format_iso_time(&lt, lastmod_buf, sizeof(lastmod_buf));
+    fm_set_string(app.frontmatter, "lastmod", lastmod_buf);
+}
+
+// #endregion
 
 // #region Render Helpers - Raw Content
 
@@ -2738,10 +2869,10 @@ static void render(void) {
         case MODE_HISTORY: render_history(); break;
         case MODE_WRITING: render_writing(); break;
         case MODE_FINISHED: render_finished(); break;
-        case MODE_TITLE_EDIT:
+        case MODE_FM_EDIT:
             if (app.prev_mode == MODE_WRITING) render_writing();
             else render_clear();
-            render_title_edit();
+            render_fm_edit();
             break;
         case MODE_HELP:
             render_writing();
@@ -2927,18 +3058,10 @@ static void handle_writing(int32_t key) {
             break;
         
         case 7: {
+            // Ctrl+G: Open frontmatter editor
             if (!CAN_MODIFY()) break;
-            app.title_edit_len = 0;
-            app.title_edit_cursor = 0;
-            const char *title = fm_get_string(app.frontmatter, "title");
-            if (title) {
-                size_t tlen = strlen(title);
-                if (tlen >= sizeof(app.title_edit_buf)) tlen = sizeof(app.title_edit_buf) - 1;
-                memcpy(app.title_edit_buf, title, tlen);
-                app.title_edit_len = tlen;
-                app.title_edit_cursor = tlen;
-            }
-            MODE_PUSH(MODE_TITLE_EDIT);
+            fm_edit_init();
+            MODE_PUSH(MODE_FM_EDIT);
             break;
         }
         
@@ -3435,18 +3558,8 @@ static void handle_input(void) {
                 case 't':
                     if (app.hist_count > 0) {
                         load_file_for_editing(app.history[app.hist_sel].path);
-                        app.title_edit_len = 0;
-                        app.title_edit_cursor = 0;
-                        const char *title = fm_get_string(app.frontmatter, "title");
-                        if (title) {
-                            size_t tlen = strlen(title);
-                            if (tlen >= sizeof(app.title_edit_buf)) tlen = sizeof(app.title_edit_buf) - 1;
-                            memcpy(app.title_edit_buf, title, tlen);
-                            app.title_edit_len = tlen;
-                            app.title_edit_cursor = tlen;
-                        }
-                        app.prev_mode = MODE_WRITING;
-                        app.mode = MODE_TITLE_EDIT;
+                        fm_edit_init();
+                        MODE_PUSH(MODE_FM_EDIT);
                     }
                     break;
                 case 'd':
@@ -3493,57 +3606,280 @@ static void handle_input(void) {
             }
             break;
         
-        case MODE_TITLE_EDIT:
+        case MODE_FM_EDIT: {
+            int32_t fi = app.fm_edit.current_field;
+            FmEditField *field = (fi >= 0 && fi < app.fm_edit.field_count) ? &app.fm_edit.fields[fi] : NULL;
+
+            if (app.fm_edit.adding_field) {
+                switch (key) {
+                    case '\x1b':
+                        app.fm_edit.adding_field = false;
+                        break;
+                    case '\r': case '\n':
+                        if (app.fm_edit.new_key_len > 0 && app.fm_edit.field_count < FM_EDIT_MAX_FIELDS) {
+                            FmEditField *nf = &app.fm_edit.fields[app.fm_edit.field_count++];
+                            memset(nf, 0, sizeof(*nf));
+                            app.fm_edit.new_key[app.fm_edit.new_key_len] = '\0';
+                            strncpy(nf->key, app.fm_edit.new_key, 63);
+                            nf->kind = FM_FIELD_STRING;
+                            app.fm_edit.current_field = app.fm_edit.field_count - 1;
+                        }
+                        app.fm_edit.adding_field = false;
+                        break;
+                    case 127: case '\b':
+                        if (app.fm_edit.new_key_len > 0) app.fm_edit.new_key_len--;
+                        break;
+                    default:
+                        if (key >= 32 && key < 127 && app.fm_edit.new_key_len < 62)
+                            app.fm_edit.new_key[app.fm_edit.new_key_len++] = (char)key;
+                        break;
+                }
+                break;
+            }
+
+            // For string fields, handle up/down/enter specially for multi-line editing
+            bool handled_by_string = false;
+            if (field && field->kind == FM_FIELD_STRING) {
+                FmFieldString *str = &field->str;
+                if (key == '\r' || key == '\n') {
+                    // Enter inserts newline
+                    if (str->len < FM_EDIT_VALUE_SIZE - 1) {
+                        memmove(str->value + str->cursor + 1, str->value + str->cursor, str->len - str->cursor);
+                        str->value[str->cursor++] = '\n';
+                        str->len++;
+                    }
+                    handled_by_string = true;
+                } else if (key == DAWN_KEY_UP || key == DAWN_KEY_DOWN) {
+                    // Navigate wrapped lines - find current line bounds and move
+                    size_t key_len = strlen(field->key);
+                    int32_t wrap_width = 70 - 4 - (int32_t)key_len - 3;
+                    if (wrap_width < 10) wrap_width = 10;
+                    WrapResult wr;
+                    wrap_init(&wr);
+                    wrap_string(str->value, str->len, wrap_width, &wr);
+                    // Find which line the cursor is on - same logic as main editor
+                    int32_t cur_line = 0;
+                    size_t col_in_line = 0;
+                    for (int32_t ln = 0; ln < wr.count; ln++) {
+                        WrapLine *wl = &wr.lines[ln];
+                        if (str->cursor >= wl->start && str->cursor <= wl->end) {
+                            cur_line = ln;
+                            col_in_line = str->cursor - wl->start;
+                            break;
+                        }
+                        if (str->cursor < wl->start) { cur_line = ln > 0 ? ln - 1 : 0; col_in_line = str->cursor - wr.lines[cur_line].start; break; }
+                        cur_line = ln;
+                        col_in_line = str->cursor - wl->start;
+                    }
+                    if (str->cursor >= str->len && wr.count > 0) {
+                        cur_line = wr.count - 1;
+                        col_in_line = str->cursor - wr.lines[cur_line].start;
+                    }
+                    int32_t target_line = key == DAWN_KEY_UP ? cur_line - 1 : cur_line + 1;
+                    if (target_line >= 0 && target_line < wr.count) {
+                        WrapLine *tl = &wr.lines[target_line];
+                        size_t line_len = tl->end - tl->start;
+                        size_t target_col = col_in_line <= line_len ? col_in_line : line_len;
+                        str->cursor = tl->start + target_col;
+                        handled_by_string = true;
+                    }
+                    wrap_free(&wr);
+                }
+            }
+
+            if (handled_by_string) break;
+
             switch (key) {
                 case '\x1b': MODE_POP(); break;
-                case '\r': case '\n': {
-                    // Ensure we have frontmatter
-                    if (!app.frontmatter) app.frontmatter = fm_create();
-                    // Update title in frontmatter
-                    if (app.title_edit_len > 0) {
-                        app.title_edit_buf[app.title_edit_len] = '\0';
-                        fm_set_string(app.frontmatter, "title", app.title_edit_buf);
-                    } else {
-                        fm_remove(app.frontmatter, "title");
-                    }
+                case '\r': case '\n':
+                    fm_edit_save();
                     save_session();
                     update_title();
                     MODE_POP();
                     break;
-                }
-                case 127: case '\b':
-                    if (app.title_edit_cursor > 0) {
-                        memmove(app.title_edit_buf + app.title_edit_cursor - 1,
-                                app.title_edit_buf + app.title_edit_cursor,
-                                app.title_edit_len - app.title_edit_cursor);
-                        app.title_edit_cursor--;
-                        app.title_edit_len--;
+                case 19:  // Ctrl+S - save
+                    fm_edit_save();
+                    save_session();
+                    update_title();
+                    MODE_POP();
+                    break;
+                case '\t':
+                    if (app.fm_edit.field_count > 0)
+                        app.fm_edit.current_field = (fi + 1) % app.fm_edit.field_count;
+                    break;
+                case DAWN_KEY_BTAB:
+                    if (app.fm_edit.field_count > 0)
+                        app.fm_edit.current_field = (fi - 1 + app.fm_edit.field_count) % app.fm_edit.field_count;
+                    break;
+                case DAWN_KEY_UP:
+                    if (fi > 0) app.fm_edit.current_field--;
+                    break;
+                case DAWN_KEY_DOWN:
+                    if (fi < app.fm_edit.field_count - 1) app.fm_edit.current_field++;
+                    break;
+                case '+':
+                    if (!field || field->kind != FM_FIELD_DATETIME) {
+                        app.fm_edit.adding_field = true;
+                        app.fm_edit.new_key_len = 0;
                     }
                     break;
-                case DAWN_KEY_DEL:
-                    if (app.title_edit_cursor < app.title_edit_len) {
-                        memmove(app.title_edit_buf + app.title_edit_cursor,
-                                app.title_edit_buf + app.title_edit_cursor + 1,
-                                app.title_edit_len - app.title_edit_cursor - 1);
-                        app.title_edit_len--;
-                    }
-                    break;
-                case DAWN_KEY_LEFT: if (app.title_edit_cursor > 0) app.title_edit_cursor--; break;
-                case DAWN_KEY_RIGHT: if (app.title_edit_cursor < app.title_edit_len) app.title_edit_cursor++; break;
-                case DAWN_KEY_HOME: app.title_edit_cursor = 0; break;
-                case DAWN_KEY_END: app.title_edit_cursor = app.title_edit_len; break;
                 default:
-                    if (key >= 32 && key < 127 && app.title_edit_len < sizeof(app.title_edit_buf) - 1) {
-                        memmove(app.title_edit_buf + app.title_edit_cursor + 1,
-                                app.title_edit_buf + app.title_edit_cursor,
-                                app.title_edit_len - app.title_edit_cursor);
-                        app.title_edit_buf[app.title_edit_cursor] = (char)key;
-                        app.title_edit_cursor++;
-                        app.title_edit_len++;
+                    if (!field) break;
+                    switch (field->kind) {
+                        case FM_FIELD_BOOL:
+                            if (key == ' ') field->boolean.value = !field->boolean.value;
+                            break;
+
+                        case FM_FIELD_DATETIME: {
+                            FmFieldDatetime *dt = &field->datetime;
+                            int32_t max_part = dt->d.has_time ? 5 : 2;
+                            switch (key) {
+                                case '<': case DAWN_KEY_LEFT:
+                                    if (dt->part > 0) dt->part--;
+                                    break;
+                                case '>': case DAWN_KEY_RIGHT:
+                                    if (dt->part < max_part) dt->part++;
+                                    break;
+                                case '-': case '_':
+                                    switch (dt->part) {
+                                        case 0: if (dt->d.year > 1900) dt->d.year--; break;
+                                        case 1: dt->d.mon = dt->d.mon > 1 ? dt->d.mon - 1 : 12; break;
+                                        case 2: dt->d.mday = dt->d.mday > 1 ? dt->d.mday - 1 : 28; break;
+                                        case 3: dt->d.hour = dt->d.hour > 0 ? dt->d.hour - 1 : 23; break;
+                                        case 4: dt->d.min = dt->d.min > 0 ? dt->d.min - 1 : 59; break;
+                                        case 5: dt->d.sec = dt->d.sec > 0 ? dt->d.sec - 1 : 59; break;
+                                    }
+                                    break;
+                                case '=': case '+':
+                                    switch (dt->part) {
+                                        case 0: dt->d.year++; break;
+                                        case 1: dt->d.mon = dt->d.mon < 12 ? dt->d.mon + 1 : 1; break;
+                                        case 2: dt->d.mday = dt->d.mday < 28 ? dt->d.mday + 1 : 1; break;
+                                        case 3: dt->d.hour = dt->d.hour < 23 ? dt->d.hour + 1 : 0; break;
+                                        case 4: dt->d.min = dt->d.min < 59 ? dt->d.min + 1 : 0; break;
+                                        case 5: dt->d.sec = dt->d.sec < 59 ? dt->d.sec + 1 : 0; break;
+                                    }
+                                    break;
+                            }
+                            break;
+                        }
+
+                        case FM_FIELD_LIST: {
+                            FmFieldList *lst = &field->list;
+                            switch (key) {
+                                // Ctrl+arrows: switch between items
+                                case DAWN_KEY_CTRL_LEFT: case DAWN_KEY_ALT_LEFT:
+                                    if (lst->selected > 0) lst->selected--;
+                                    lst->cursor = lst->item_lens[lst->selected];
+                                    break;
+                                case DAWN_KEY_CTRL_RIGHT: case DAWN_KEY_ALT_RIGHT:
+                                    if (lst->selected < lst->count - 1) lst->selected++;
+                                    lst->cursor = lst->item_lens[lst->selected];
+                                    break;
+                                // Regular arrows: move cursor within item
+                                case DAWN_KEY_LEFT:
+                                    if (lst->cursor > 0) lst->cursor--;
+                                    break;
+                                case DAWN_KEY_RIGHT:
+                                    if (lst->selected < lst->count && lst->cursor < lst->item_lens[lst->selected])
+                                        lst->cursor++;
+                                    break;
+                                case DAWN_KEY_HOME:
+                                    lst->cursor = 0;
+                                    break;
+                                case DAWN_KEY_END:
+                                    if (lst->selected < lst->count)
+                                        lst->cursor = lst->item_lens[lst->selected];
+                                    break;
+                                // Ctrl+N: add new item
+                                case 14:  // Ctrl+N
+                                    if (lst->count < FM_EDIT_MAX_LIST_ITEMS) {
+                                        lst->items[lst->count][0] = '\0';
+                                        lst->item_lens[lst->count] = 0;
+                                        lst->selected = lst->count++;
+                                        lst->cursor = 0;
+                                    }
+                                    break;
+                                // Ctrl+D or backspace on empty: delete item
+                                case 4:  // Ctrl+D
+                                    if (lst->count > 0) {
+                                        for (int32_t i = lst->selected; i < lst->count - 1; i++) {
+                                            memcpy(lst->items[i], lst->items[i+1], FM_EDIT_VALUE_SIZE);
+                                            lst->item_lens[i] = lst->item_lens[i+1];
+                                        }
+                                        lst->count--;
+                                        if (lst->selected >= lst->count && lst->selected > 0) lst->selected--;
+                                        lst->cursor = lst->count > 0 ? lst->item_lens[lst->selected] : 0;
+                                    }
+                                    break;
+                                case 127: case '\b':
+                                    if (lst->cursor > 0 && lst->selected < lst->count) {
+                                        memmove(lst->items[lst->selected] + lst->cursor - 1,
+                                                lst->items[lst->selected] + lst->cursor,
+                                                lst->item_lens[lst->selected] - lst->cursor);
+                                        lst->cursor--;
+                                        lst->item_lens[lst->selected]--;
+                                    } else if (lst->cursor == 0 && lst->item_lens[lst->selected] == 0 && lst->count > 0) {
+                                        // Backspace on empty item: delete it
+                                        for (int32_t i = lst->selected; i < lst->count - 1; i++) {
+                                            memcpy(lst->items[i], lst->items[i+1], FM_EDIT_VALUE_SIZE);
+                                            lst->item_lens[i] = lst->item_lens[i+1];
+                                        }
+                                        lst->count--;
+                                        if (lst->selected >= lst->count && lst->selected > 0) lst->selected--;
+                                        lst->cursor = lst->count > 0 ? lst->item_lens[lst->selected] : 0;
+                                    }
+                                    break;
+                                default:
+                                    if (key >= 32 && key < 127 && lst->selected < lst->count &&
+                                        lst->item_lens[lst->selected] < FM_EDIT_VALUE_SIZE - 1) {
+                                        memmove(lst->items[lst->selected] + lst->cursor + 1,
+                                                lst->items[lst->selected] + lst->cursor,
+                                                lst->item_lens[lst->selected] - lst->cursor);
+                                        lst->items[lst->selected][lst->cursor++] = (char)key;
+                                        lst->item_lens[lst->selected]++;
+                                    }
+                                    break;
+                            }
+                            break;
+                        }
+
+                        case FM_FIELD_STRING:
+                        default: {
+                            FmFieldString *str = &field->str;
+                            switch (key) {
+                                case 127: case '\b':
+                                    if (str->cursor > 0) {
+                                        memmove(str->value + str->cursor - 1, str->value + str->cursor, str->len - str->cursor);
+                                        str->cursor--;
+                                        str->len--;
+                                    }
+                                    break;
+                                case DAWN_KEY_DEL:
+                                    if (str->cursor < str->len) {
+                                        memmove(str->value + str->cursor, str->value + str->cursor + 1, str->len - str->cursor - 1);
+                                        str->len--;
+                                    }
+                                    break;
+                                case DAWN_KEY_LEFT: if (str->cursor > 0) str->cursor--; break;
+                                case DAWN_KEY_RIGHT: if (str->cursor < str->len) str->cursor++; break;
+                                case DAWN_KEY_HOME: str->cursor = 0; break;
+                                case DAWN_KEY_END: str->cursor = str->len; break;
+                                default:
+                                    if (key >= 32 && key < 127 && str->len < FM_EDIT_VALUE_SIZE - 1) {
+                                        memmove(str->value + str->cursor + 1, str->value + str->cursor, str->len - str->cursor);
+                                        str->value[str->cursor++] = (char)key;
+                                        str->len++;
+                                    }
+                                    break;
+                            }
+                            break;
+                        }
                     }
                     break;
             }
             break;
+        }
         
         case MODE_BLOCK_EDIT:
             if (app.block_edit.type == BLOCK_IMAGE) {
@@ -3855,8 +4191,10 @@ bool dawn_frame(void) {
         int64_t now = DAWN_BACKEND(app)->clock(DAWN_CLOCK_SEC);
         if (app.last_save_time == 0) app.last_save_time = now;
         else if (now - app.last_save_time >= 5) {
-            save_session();
-            app.last_save_time = now;
+            if (app.mode == MODE_WRITING) {
+                save_session();
+                app.last_save_time = now;
+            }
         }
     }
     handle_input();

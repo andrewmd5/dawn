@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdio.h>
 
+
 // #region Types
 
 struct Frontmatter {
@@ -294,7 +295,6 @@ bool fm_set_string(Frontmatter *fm, const char *key, const char *value) {
     struct fy_node *key_node = fy_node_create_scalar_copy(fm->doc, key, strlen(key));
     if (!key_node) return false;
 
-    // Build value node
     struct fy_node *val_node;
     if (value) {
         val_node = fy_node_create_scalar_copy(fm->doc, value, strlen(value));
@@ -343,6 +343,112 @@ bool fm_remove(Frontmatter *fm, const char *key) {
     return false;
 }
 
+bool fm_set_sequence(Frontmatter *fm, const char *key, const char **items, int count, bool flow_style) {
+    if (!fm || !fm->doc || !key) return false;
+
+    struct fy_node *root = fy_document_root(fm->doc);
+    if (!root || !fy_node_is_mapping(root)) return false;
+
+    // Remove existing key if present
+    struct fy_node_pair *to_remove = NULL;
+    void *iter = NULL;
+    struct fy_node_pair *pair;
+    while ((pair = fy_node_mapping_iterate(root, &iter))) {
+        struct fy_node *k = fy_node_pair_key(pair);
+        if (k) {
+            const char *kstr = fy_node_get_scalar0(k);
+            if (kstr && strcmp(kstr, key) == 0) {
+                to_remove = pair;
+                break;
+            }
+        }
+    }
+    if (to_remove) {
+        fy_node_mapping_remove(root, to_remove);
+    }
+
+    // Build key node
+    struct fy_node *key_node = fy_node_create_scalar_copy(fm->doc, key, strlen(key));
+    if (!key_node) return false;
+
+    // Create sequence with desired style by parsing appropriate syntax
+    // Flow: "[]", Block: created directly (defaults to block on emit)
+    struct fy_node *seq_node;
+    if (flow_style) {
+        seq_node = fy_node_build_from_string(fm->doc, "[]", 2);
+    } else {
+        seq_node = fy_node_create_sequence(fm->doc);
+    }
+    if (!seq_node) {
+        fy_node_free(key_node);
+        return false;
+    }
+
+    // Add items to the sequence
+    for (int i = 0; i < count; i++) {
+        struct fy_node *item_node;
+        if (items[i]) {
+            item_node = fy_node_create_scalar_copy(fm->doc, items[i], strlen(items[i]));
+        } else {
+            item_node = fy_node_build_from_string(fm->doc, "~", 1);
+        }
+        if (!item_node) {
+            fy_node_free(key_node);
+            fy_node_free(seq_node);
+            return false;
+        }
+        if (fy_node_sequence_append(seq_node, item_node) != 0) {
+            fy_node_free(item_node);
+            fy_node_free(key_node);
+            fy_node_free(seq_node);
+            return false;
+        }
+    }
+
+    // Append key-sequence pair
+    int ret = fy_node_mapping_append(root, key_node, seq_node);
+    return ret == 0;
+}
+
+int fm_get_sequence_count(const Frontmatter *fm, const char *key) {
+    if (!fm || !fm->doc || !key) return 0;
+
+    struct fy_node *root = fy_document_root(fm->doc);
+    if (!root) return 0;
+
+    struct fy_node *node = fy_node_by_path(root, key, -1, FYNWF_DONT_FOLLOW);
+    if (!node || !fy_node_is_sequence(node)) return 0;
+
+    return fy_node_sequence_item_count(node);
+}
+
+const char *fm_get_sequence_item(const Frontmatter *fm, const char *key, int index) {
+    if (!fm || !fm->doc || !key || index < 0) return NULL;
+
+    struct fy_node *root = fy_document_root(fm->doc);
+    if (!root) return NULL;
+
+    struct fy_node *node = fy_node_by_path(root, key, -1, FYNWF_DONT_FOLLOW);
+    if (!node || !fy_node_is_sequence(node)) return NULL;
+
+    struct fy_node *item = fy_node_sequence_get_by_index(node, index);
+    if (!item || !fy_node_is_scalar(item)) return NULL;
+
+    return fy_node_get_scalar0(item);
+}
+
+bool fm_is_sequence_flow(const Frontmatter *fm, const char *key) {
+    if (!fm || !fm->doc || !key) return false;
+
+    struct fy_node *root = fy_document_root(fm->doc);
+    if (!root) return false;
+
+    struct fy_node *node = fy_node_by_path(root, key, -1, FYNWF_DONT_FOLLOW);
+    if (!node || !fy_node_is_sequence(node)) return false;
+
+    return fy_node_get_style(node) == FYNS_FLOW;
+}
+
 // #endregion
 
 // #region Serialization
@@ -359,7 +465,7 @@ char *fm_to_string(const Frontmatter *fm, size_t *len) {
         return NULL;
     }
 
-    // Emit YAML content
+    // Emit YAML content - use ORIGINAL mode to preserve existing styles
     char *yaml = fy_emit_document_to_string(fm->doc, FYECF_DEFAULT | FYECF_NO_ENDING_NEWLINE);
     if (!yaml) {
         if (len) *len = 0;
