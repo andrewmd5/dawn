@@ -44,6 +44,7 @@ add_subdirectory(third-party/utf8proc)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(ENABLE_LIBCLANG OFF CACHE BOOL "" FORCE)
 add_subdirectory(third-party/libfyaml)
+set_target_properties(fy-tool fy-thread fy-b3sum fy-allocators PROPERTIES EXCLUDE_FROM_ALL TRUE)
 
 if(NOT EMSCRIPTEN)
     # Select platform-specific backend
