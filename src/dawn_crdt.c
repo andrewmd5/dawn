@@ -3,6 +3,7 @@
 #include "dawn_crdt.h"
 #include "cJSON.h"
 #include "dawn_types.h"
+#include "dawn_utils.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -90,8 +91,7 @@ CrdtState* crdt_parse(const char* json, size_t len)
 
     cJSON* node = cJSON_GetObjectItem(root, "node");
     if (node && cJSON_IsString(node)) {
-        strncpy(state->node, node->valuestring, CRDT_NODE_ID_LEN);
-        state->node[CRDT_NODE_ID_LEN] = '\0';
+        dawn_strncpy(state->node, node->valuestring, CRDT_NODE_ID_LEN);
     }
 
     cJSON* entries = cJSON_GetObjectItem(root, "entries");
@@ -112,7 +112,7 @@ CrdtState* crdt_parse(const char* json, size_t len)
                 e->value = (value_j && cJSON_IsString(value_j)) ? strdup(value_j->valuestring) : NULL;
                 e->timestamp = (ts_j && cJSON_IsNumber(ts_j)) ? (int64_t)ts_j->valuedouble : 0;
                 if (node_j && cJSON_IsString(node_j)) {
-                    strncpy(e->node, node_j->valuestring, CRDT_NODE_ID_LEN);
+                    dawn_strncpy(e->node, node_j->valuestring, CRDT_NODE_ID_LEN);
                 }
                 state->entry_count++;
             }
@@ -135,7 +135,7 @@ CrdtState* crdt_parse(const char* json, size_t len)
                 t->key = strdup(key);
                 t->timestamp = (ts_j && cJSON_IsNumber(ts_j)) ? (int64_t)ts_j->valuedouble : 0;
                 if (node_j && cJSON_IsString(node_j)) {
-                    strncpy(t->node, node_j->valuestring, CRDT_NODE_ID_LEN);
+                    dawn_strncpy(t->node, node_j->valuestring, CRDT_NODE_ID_LEN);
                 }
                 state->tombstone_count++;
             }
@@ -192,7 +192,7 @@ CrdtState* crdt_merge(const CrdtState* a, const CrdtState* b)
         return crdt_merge(a, a);
 
     CrdtState* result = calloc(1, sizeof(CrdtState));
-    strncpy(result->node, a->node, CRDT_NODE_ID_LEN);
+    dawn_strncpy(result->node, a->node, CRDT_NODE_ID_LEN);
 
     int32_t max_entries = a->entry_count + b->entry_count;
     int32_t max_tombs = a->tombstone_count + b->tombstone_count;
@@ -277,24 +277,24 @@ CrdtState* crdt_merge(const CrdtState* a, const CrdtState* b)
                 e->key = strdup(best_entry->key);
                 e->value = best_entry->value ? strdup(best_entry->value) : NULL;
                 e->timestamp = best_entry->timestamp;
-                strncpy(e->node, best_entry->node, CRDT_NODE_ID_LEN);
+                dawn_strncpy(e->node, best_entry->node, CRDT_NODE_ID_LEN);
             } else {
                 CrdtTombstone* t = &result->tombstones[result->tombstone_count++];
                 t->key = strdup(best_tomb->key);
                 t->timestamp = best_tomb->timestamp;
-                strncpy(t->node, best_tomb->node, CRDT_NODE_ID_LEN);
+                dawn_strncpy(t->node, best_tomb->node, CRDT_NODE_ID_LEN);
             }
         } else if (best_entry) {
             CrdtEntry* e = &result->entries[result->entry_count++];
             e->key = strdup(best_entry->key);
             e->value = best_entry->value ? strdup(best_entry->value) : NULL;
             e->timestamp = best_entry->timestamp;
-            strncpy(e->node, best_entry->node, CRDT_NODE_ID_LEN);
+            dawn_strncpy(e->node, best_entry->node, CRDT_NODE_ID_LEN);
         } else if (best_tomb) {
             CrdtTombstone* t = &result->tombstones[result->tombstone_count++];
             t->key = strdup(best_tomb->key);
             t->timestamp = best_tomb->timestamp;
-            strncpy(t->node, best_tomb->node, CRDT_NODE_ID_LEN);
+            dawn_strncpy(t->node, best_tomb->node, CRDT_NODE_ID_LEN);
         }
     }
 
@@ -347,14 +347,14 @@ void crdt_upsert(CrdtState* state, const char* key, const char* value)
         free(existing->value);
         existing->value = value ? strdup(value) : NULL;
         existing->timestamp = ts;
-        strncpy(existing->node, state->node, CRDT_NODE_ID_LEN);
+        dawn_strncpy(existing->node, state->node, CRDT_NODE_ID_LEN);
     } else {
         state->entries = realloc(state->entries, sizeof(CrdtEntry) * (size_t)(state->entry_count + 1));
         CrdtEntry* e = &state->entries[state->entry_count++];
         e->key = strdup(key);
         e->value = value ? strdup(value) : NULL;
         e->timestamp = ts;
-        strncpy(e->node, state->node, CRDT_NODE_ID_LEN);
+        dawn_strncpy(e->node, state->node, CRDT_NODE_ID_LEN);
     }
 }
 
@@ -368,13 +368,13 @@ void crdt_remove(CrdtState* state, const char* key)
     CrdtTombstone* existing = find_tombstone(state, key);
     if (existing) {
         existing->timestamp = ts;
-        strncpy(existing->node, state->node, CRDT_NODE_ID_LEN);
+        dawn_strncpy(existing->node, state->node, CRDT_NODE_ID_LEN);
     } else {
         state->tombstones = realloc(state->tombstones, sizeof(CrdtTombstone) * (size_t)(state->tombstone_count + 1));
         CrdtTombstone* t = &state->tombstones[state->tombstone_count++];
         t->key = strdup(key);
         t->timestamp = ts;
-        strncpy(t->node, state->node, CRDT_NODE_ID_LEN);
+        dawn_strncpy(t->node, state->node, CRDT_NODE_ID_LEN);
     }
 }
 

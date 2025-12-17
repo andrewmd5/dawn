@@ -20,6 +20,32 @@
 
 // #endregion
 
+// #region String Utilities
+
+//! Safe string copy using memcpy, always null-terminates
+//! @param dest destination buffer (must be at least strlen(src)+1 bytes)
+//! @param src source string
+static inline void dawn_strcpy(char* dest, const char* src)
+{
+    size_t len = strlen(src);
+    memcpy(dest, src, len + 1);
+}
+
+//! Safe string copy with max length, always null-terminates
+//! @param dest destination buffer (must be at least n+1 bytes)
+//! @param src source string
+//! @param n max bytes to copy (not including null terminator)
+static inline void dawn_strncpy(char* dest, const char* src, size_t n)
+{
+    size_t len = strlen(src);
+    if (len > n)
+        len = n;
+    memcpy(dest, src, len);
+    dest[len] = '\0';
+}
+
+// #endregion
+
 // #region Character Classification (ASCII)
 
 #define ISIN_(ch, lo, hi) ((uint8_t)((ch) - (lo)) <= (hi) - (lo))
