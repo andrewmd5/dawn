@@ -40,10 +40,10 @@ DAWN_ENUM(uint8_t) {
     DAWN_UNDERLINE_DASHED
 } DawnUnderline;
 
-DAWN_ENUM(int16_t) {
+DAWN_ENUM(int32_t) {
     DAWN_KEY_NONE = -1,
     DAWN_KEY_ESC = 0x1b,
-    DAWN_KEY_UP = 1000,
+    DAWN_KEY_UP = 0x110000, // Above Unicode max (0x10FFFF) to not conflict with codepoints
     DAWN_KEY_DOWN,
     DAWN_KEY_RIGHT,
     DAWN_KEY_LEFT,

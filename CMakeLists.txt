@@ -3,13 +3,12 @@ project(dawn C)
 
 if(MSVC)
     set(CMAKE_C_STANDARD 17)
-    # Enable LTO globally for Release
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 else()
     set(CMAKE_C_STANDARD 23)
 endif()
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 
 option(USE_LIBAI "Build with Apple Intelligence (macOS 26+)" OFF)
 option(ENABLE_ASAN "Enable AddressSanitizer" OFF)
@@ -44,11 +43,7 @@ add_subdirectory(third-party/utf8proc)
 # libfyaml for YAML frontmatter parsing
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(ENABLE_LIBCLANG OFF CACHE BOOL "" FORCE)
-if(WIN32)
-    add_subdirectory(C:/Users/andrew/projects/libfyaml ${CMAKE_BINARY_DIR}/libfyaml)
-else()
-    add_subdirectory(third-party/libfyaml)
-endif()
+add_subdirectory(third-party/libfyaml)
 
 if(NOT EMSCRIPTEN)
     # Select platform-specific backend
@@ -68,19 +63,13 @@ if(NOT EMSCRIPTEN)
         third-party/cJSON.c
     )
 
-    if(WIN32)
-        set(LIBFYAML_INCLUDE C:/Users/andrew/projects/libfyaml/include)
-    else()
-        set(LIBFYAML_INCLUDE third-party/libfyaml/include)
-    endif()
-
     target_include_directories(dawn PRIVATE
         src
         third-party
         third-party/nanosvg/src
         ${CMAKE_BINARY_DIR}/third-party/pcre2
         third-party/pcre2/src
-        ${LIBFYAML_INCLUDE}
+        third-party/libfyaml/include
     )
 
     if(MSVC)
@@ -155,7 +144,7 @@ if(NOT EMSCRIPTEN)
     )
 
     if(MSVC)
-        target_compile_options(test-block PRIVATE /W4 /WX)
+        target_compile_options(test-block PRIVATE /W4 /WX /utf-8)
         target_compile_definitions(test-block PRIVATE _CRT_SECURE_NO_WARNINGS)
     else()
         target_compile_options(test-block PRIVATE

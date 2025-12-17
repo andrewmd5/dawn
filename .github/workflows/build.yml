@@ -41,3 +41,33 @@ jobs:
 
       - name: Verify binary
         run: ./build/dawn -h
+
+  build-windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build
+        run: |
+          cmake -S . -B build -A x64
+          cmake --build build --config Release
+
+      - name: Verify binary
+        run: ./build/Release/dawn.exe -h
+
+  build-windows-arm64:
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build
+        run: |
+          cmake -S . -B build -A ARM64
+          cmake --build build --config Release
+
+      - name: Verify binary
+        run: ./build/Release/dawn.exe -h

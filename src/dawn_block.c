@@ -108,8 +108,8 @@ static void block_free_table_data(Block* block)
 //! Allocate table data arrays. Returns false on allocation failure.
 static bool block_alloc_table_data(Block* block, int32_t row_count, int32_t col_count)
 {
-    block->data.table.row_count = row_count;
-    block->data.table.col_count = col_count;
+    block->data.table.row_count = (uint8_t)row_count;
+    block->data.table.col_count = (uint8_t)col_count;
 
     block->data.table.align = calloc((size_t)col_count, sizeof(MdAlign));
     block->data.table.row_starts = calloc((size_t)row_count, sizeof(size_t));
@@ -178,9 +178,9 @@ void block_cache_parse(BlockCache* bc, const GapBuffer* gb, int32_t wrap_width, 
     // Clear existing blocks
     block_cache_invalidate(bc);
 
-    bc->text_len = gap_len(gb);
-    bc->wrap_width = wrap_width;
-    bc->text_height = text_height;
+    bc->text_len = (uint32_t)gap_len(gb);
+    bc->wrap_width = (int16_t)wrap_width;
+    bc->text_height = (int16_t)text_height;
     bc->total_vrows = 0;
 
     size_t pos = 0;
@@ -216,9 +216,9 @@ void block_cache_parse(BlockCache* bc, const GapBuffer* gb, int32_t wrap_width, 
         if (!block)
             break; // Out of memory
 
-        block->blank_start = blank_start;
-        block->start = pos;
-        block->leading_blank_lines = blank_lines;
+        block->blank_start = (uint32_t)blank_start;
+        block->start = (uint32_t)pos;
+        block->leading_blank_lines = (uint8_t)blank_lines;
         block->vrow_start = bc->total_vrows + blank_lines;
         bc->total_vrows += blank_lines; // Account for skipped blank lines in total
 
@@ -248,7 +248,7 @@ void block_cache_parse(BlockCache* bc, const GapBuffer* gb, int32_t wrap_width, 
         }
 
         // Calculate virtual rows for this block
-        block->vrow_count = calculate_block_vrows(block, gb, wrap_width, text_height);
+        block->vrow_count = (int16_t)calculate_block_vrows(block, gb, wrap_width, text_height);
         bc->total_vrows += block->vrow_count;
     }
 
@@ -513,7 +513,7 @@ static bool try_parse_image(Block* block, const GapBuffer* gb, size_t pos)
     }
 
     block->type = BLOCK_IMAGE;
-    block->end = pos + img.total_len;
+    block->end = (uint32_t)(pos + img.total_len);
 
     // Include trailing whitespace and newline
     while (block->end < len && gap_at(gb, block->end) == ' ') {
@@ -548,12 +548,12 @@ static bool try_parse_code_block(Block* block, const GapBuffer* gb, size_t pos)
     }
 
     block->type = BLOCK_CODE;
-    block->end = pos + code.total_len;
+    block->end = (uint32_t)(pos + code.total_len);
 
-    block->data.code.lang_start = code.spans[1].start;
-    block->data.code.lang_len = code.spans[1].len;
-    block->data.code.content_start = code.spans[0].start;
-    block->data.code.content_len = code.spans[0].len;
+    block->data.code.lang_start = (uint32_t)code.spans[1].start;
+    block->data.code.lang_len = (uint16_t)code.spans[1].len;
+    block->data.code.content_start = (uint32_t)code.spans[0].start;
+    block->data.code.content_len = (uint32_t)code.spans[0].len;
     block->data.code.highlighted = NULL;
     block->data.code.highlighted_len = 0;
 
@@ -571,10 +571,10 @@ static bool try_parse_block_math(Block* block, const GapBuffer* gb, size_t pos)
     }
 
     block->type = BLOCK_MATH;
-    block->end = pos + math.total_len;
+    block->end = (uint32_t)(pos + math.total_len);
 
-    block->data.math.content_start = math.span.start;
-    block->data.math.content_len = math.span.len;
+    block->data.math.content_start = (uint32_t)math.span.start;
+    block->data.math.content_len = (uint32_t)math.span.len;
     block->data.math.tex_sketch = NULL;
 
     return true;
@@ -614,7 +614,7 @@ static bool try_parse_table(Block* block, const GapBuffer* gb, size_t pos)
     }
 
     block->type = BLOCK_TABLE;
-    block->end = table_end;
+    block->end = (uint32_t)table_end;
     memcpy(block->data.table.align, tbl.align, (size_t)tbl.col_count * sizeof(MdAlign));
 
     // Second pass: fill row data
@@ -629,14 +629,14 @@ static bool try_parse_table(Block* block, const GapBuffer* gb, size_t pos)
         size_t row_len = row_end - row_start;
 
         if (row_len > 0) {
-            block->data.table.row_starts[row_idx] = row_start;
-            block->data.table.row_lens[row_idx] = row_len;
+            block->data.table.row_starts[row_idx] = (uint32_t)row_start;
+            block->data.table.row_lens[row_idx] = (uint16_t)row_len;
 
             int32_t cells = md_parse_table_row(gb, row_start, row_len,
                 block->data.table.cell_starts[row_idx],
                 block->data.table.cell_lens[row_idx],
                 tbl.col_count);
-            block->data.table.row_cell_counts[row_idx] = cells;
+            block->data.table.row_cell_counts[row_idx] = (uint8_t)cells;
             row_idx++;
         }
 
@@ -657,14 +657,14 @@ static bool try_parse_hr(Block* block, const GapBuffer* gb, size_t pos)
     }
 
     block->type = BLOCK_HR;
-    block->end = pos + rule_len;
+    block->end = (uint32_t)(pos + rule_len);
 
     // Include trailing newline
     if (block->end < gap_len(gb) && gap_at(gb, block->end) == '\n') {
         block->end++;
     }
 
-    block->data.hr.rule_len = rule_len;
+    block->data.hr.rule_len = (uint16_t)rule_len;
 
     return true;
 }
@@ -687,21 +687,21 @@ static bool try_parse_header(Block* block, const GapBuffer* gb, size_t pos, int3
 
     // Find end of header line
     size_t end = find_line_end(gb, pos);
-    block->end = end;
+    block->end = (uint32_t)end;
 
     // Include trailing newline
     if (block->end < gap_len(gb) && gap_at(gb, block->end) == '\n') {
         block->end++;
     }
 
-    block->data.header.level = level;
-    block->data.header.content_start = content_start;
+    block->data.header.level = (uint8_t)level;
+    block->data.header.content_start = (uint32_t)content_start;
 
     // Check for heading ID {#id}
     MdMatch heading_id;
     if (md_check_heading_id(gb, content_start, &heading_id)) {
-        block->data.header.id_start = heading_id.span.start;
-        block->data.header.id_len = heading_id.span.len;
+        block->data.header.id_start = (uint32_t)heading_id.span.start;
+        block->data.header.id_len = (uint16_t)heading_id.span.len;
     } else {
         block->data.header.id_start = 0;
         block->data.header.id_len = 0;
@@ -749,10 +749,10 @@ static bool try_parse_footnote_def(Block* block, const GapBuffer* gb, size_t pos
         }
     }
 
-    block->end = end;
-    block->data.footnote.id_start = def.spans[0].start;
-    block->data.footnote.id_len = def.spans[0].len;
-    block->data.footnote.content_start = def.spans[1].start;
+    block->end = (uint32_t)end;
+    block->data.footnote.id_start = (uint32_t)def.spans[0].start;
+    block->data.footnote.id_len = (uint16_t)def.spans[0].len;
+    block->data.footnote.content_start = (uint32_t)def.spans[1].start;
     block_parse_inline_runs(block, gb);
 
     return true;
@@ -787,9 +787,9 @@ static bool try_parse_blockquote(Block* block, const GapBuffer* gb, size_t pos)
         }
     }
 
-    block->end = end;
-    block->data.quote.level = level;
-    block->data.quote.content_start = content_start;
+    block->end = (uint32_t)end;
+    block->data.quote.level = (uint8_t)level;
+    block->data.quote.content_start = (uint32_t)content_start;
     block_parse_inline_runs(block, gb);
 
     return true;
@@ -807,14 +807,14 @@ static bool try_parse_list_item(Block* block, const GapBuffer* gb, size_t pos)
     int32_t task_state = md_check_task(gb, pos, &content_start, &indent);
     if (task_state > 0) {
         block->type = BLOCK_LIST_ITEM;
-        block->end = find_line_end(gb, pos);
+        block->end = (uint32_t)find_line_end(gb, pos);
         if (block->end < gap_len(gb) && gap_at(gb, block->end) == '\n') {
             block->end++;
         }
         block->data.list.list_type = 1; // Task lists are unordered
-        block->data.list.indent = indent;
-        block->data.list.task_state = task_state;
-        block->data.list.content_start = content_start;
+        block->data.list.indent = (uint8_t)indent;
+        block->data.list.task_state = (uint8_t)task_state;
+        block->data.list.content_start = (uint32_t)content_start;
         block_parse_inline_runs(block, gb);
         return true;
     }
@@ -825,15 +825,15 @@ static bool try_parse_list_item(Block* block, const GapBuffer* gb, size_t pos)
         return false;
 
     block->type = BLOCK_LIST_ITEM;
-    block->end = find_line_end(gb, pos);
+    block->end = (uint32_t)find_line_end(gb, pos);
     if (block->end < gap_len(gb) && gap_at(gb, block->end) == '\n') {
         block->end++;
     }
 
-    block->data.list.list_type = list_type;
-    block->data.list.indent = indent;
+    block->data.list.list_type = (uint8_t)list_type;
+    block->data.list.indent = (uint8_t)indent;
     block->data.list.task_state = 0;
-    block->data.list.content_start = content_start;
+    block->data.list.content_start = (uint32_t)content_start;
     block_parse_inline_runs(block, gb);
 
     return true;
@@ -885,7 +885,7 @@ static void parse_paragraph(Block* block, const GapBuffer* gb, size_t pos, int32
         end++;
     }
 
-    block->end = end;
+    block->end = (uint32_t)end;
 
     // Parse inline runs eagerly
     block_parse_inline_runs(block, gb);
@@ -959,7 +959,7 @@ static int32_t calculate_block_vrows(const Block* block, const GapBuffer* gb, in
         if (image_get_size(cached_path, &pixel_w, &pixel_h)) {
             int32_t rows = image_calc_rows(pixel_w, pixel_h, img_cols, img_rows_spec);
             // Cache for later
-            ((Block*)block)->data.image.display_rows = rows > 0 ? rows : 1;
+            ((Block*)block)->data.image.display_rows = (int16_t)(rows > 0 ? rows : 1);
             return rows > 0 ? rows : 1;
         }
         return 1;
@@ -1479,7 +1479,7 @@ static InlineRun* result_add_run(InlineParseResult* result)
         if (!new_runs)
             return NULL;
         result->runs = new_runs;
-        result->run_capacity = new_cap;
+        result->run_capacity = (int16_t)new_cap;
     }
 
     InlineRun* run = &result->runs[result->run_count++];
@@ -1514,9 +1514,9 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
             if (pos > run_start) {
                 InlineRun* run = result_add_run(result);
                 if (run) {
-                    run->byte_start = run_start;
-                    run->byte_end = pos;
-                    run->style = run_style;
+                    run->byte_start = (uint32_t)run_start;
+                    run->byte_end = (uint32_t)pos;
+                    run->style = (uint16_t)run_style;
                     run->type = RUN_TEXT;
                 }
             }
@@ -1540,9 +1540,9 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
                 if (pos > run_start) {
                     InlineRun* run = result_add_run(result);
                     if (run) {
-                        run->byte_start = run_start;
-                        run->byte_end = pos;
-                        run->style = run_style;
+                        run->byte_start = (uint32_t)run_start;
+                        run->byte_end = (uint32_t)pos;
+                        run->style = (uint16_t)run_style;
                         run->type = RUN_TEXT;
                     }
                 }
@@ -1550,9 +1550,9 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
                 // Add escape run
                 InlineRun* esc_run = result_add_run(result);
                 if (esc_run) {
-                    esc_run->byte_start = pos;
-                    esc_run->byte_end = pos + 2;
-                    esc_run->style = active_style;
+                    esc_run->byte_start = (uint32_t)pos;
+                    esc_run->byte_end = (uint32_t)(pos + 2);
+                    esc_run->style = (uint16_t)active_style;
                     esc_run->type = RUN_ESCAPE;
                     esc_run->data.escape.escaped_char = next;
                 }
@@ -1572,9 +1572,9 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
                 if (pos > run_start) {
                     InlineRun* run = result_add_run(result);
                     if (run) {
-                        run->byte_start = run_start;
-                        run->byte_end = pos;
-                        run->style = run_style;
+                        run->byte_start = (uint32_t)run_start;
+                        run->byte_end = (uint32_t)pos;
+                        run->style = (uint16_t)run_style;
                         run->type = RUN_TEXT;
                     }
                 }
@@ -1584,7 +1584,7 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
                 if (auto_run) {
                     auto_run->byte_start = (uint32_t)pos;
                     auto_run->byte_end = (uint32_t)(pos + autolink.total_len);
-                    auto_run->style = active_style;
+                    auto_run->style = (uint16_t)active_style;
                     auto_run->type = RUN_AUTOLINK;
                     auto_run->flags = autolink.is_email ? INLINE_FLAG_IS_EMAIL : 0;
                     auto_run->data.autolink.url_start = (uint32_t)autolink.span.start;
@@ -1608,9 +1608,9 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
                 if (pos > run_start) {
                     InlineRun* run = result_add_run(result);
                     if (run) {
-                        run->byte_start = run_start;
-                        run->byte_end = pos;
-                        run->style = run_style;
+                        run->byte_start = (uint32_t)run_start;
+                        run->byte_end = (uint32_t)pos;
+                        run->style = (uint16_t)run_style;
                         run->type = RUN_TEXT;
                     }
                 }
@@ -1618,12 +1618,12 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
                 // Add entity run
                 InlineRun* ent_run = result_add_run(result);
                 if (ent_run) {
-                    ent_run->byte_start = pos;
-                    ent_run->byte_end = pos + entity_total;
-                    ent_run->style = active_style;
+                    ent_run->byte_start = (uint32_t)pos;
+                    ent_run->byte_end = (uint32_t)(pos + entity_total);
+                    ent_run->style = (uint16_t)active_style;
                     ent_run->type = RUN_ENTITY;
                     memcpy(ent_run->data.entity.utf8, utf8_buf, 8);
-                    ent_run->data.entity.utf8_len = utf8_len;
+                    ent_run->data.entity.utf8_len = (uint8_t)utf8_len;
                 }
 
                 pos += entity_total;
@@ -1640,9 +1640,9 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
             if (pos > run_start) {
                 InlineRun* run = result_add_run(result);
                 if (run) {
-                    run->byte_start = run_start;
-                    run->byte_end = pos;
-                    run->style = run_style;
+                    run->byte_start = (uint32_t)run_start;
+                    run->byte_end = (uint32_t)pos;
+                    run->style = (uint16_t)run_style;
                     run->type = RUN_TEXT;
                 }
             }
@@ -1650,14 +1650,14 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
             // Add link run
             InlineRun* link_run = result_add_run(result);
             if (link_run) {
-                link_run->byte_start = pos;
-                link_run->byte_end = pos + link.total_len;
-                link_run->style = active_style;
+                link_run->byte_start = (uint32_t)pos;
+                link_run->byte_end = (uint32_t)(pos + link.total_len);
+                link_run->style = (uint16_t)active_style;
                 link_run->type = RUN_LINK;
-                link_run->data.link.text_start = link.spans[0].start;
-                link_run->data.link.text_len = link.spans[0].len;
-                link_run->data.link.url_start = link.spans[1].start;
-                link_run->data.link.url_len = link.spans[1].len;
+                link_run->data.link.text_start = (uint32_t)link.spans[0].start;
+                link_run->data.link.text_len = (uint16_t)link.spans[0].len;
+                link_run->data.link.url_start = (uint32_t)link.spans[1].start;
+                link_run->data.link.url_len = (uint16_t)link.spans[1].len;
             }
 
             pos += link.total_len;
@@ -1673,9 +1673,9 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
             if (pos > run_start) {
                 InlineRun* run = result_add_run(result);
                 if (run) {
-                    run->byte_start = run_start;
-                    run->byte_end = pos;
-                    run->style = run_style;
+                    run->byte_start = (uint32_t)run_start;
+                    run->byte_end = (uint32_t)pos;
+                    run->style = (uint16_t)run_style;
                     run->type = RUN_TEXT;
                 }
             }
@@ -1683,12 +1683,12 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
             // Add footnote run
             InlineRun* fn_run = result_add_run(result);
             if (fn_run) {
-                fn_run->byte_start = pos;
-                fn_run->byte_end = pos + fn_ref.total_len;
-                fn_run->style = active_style;
+                fn_run->byte_start = (uint32_t)pos;
+                fn_run->byte_end = (uint32_t)(pos + fn_ref.total_len);
+                fn_run->style = (uint16_t)active_style;
                 fn_run->type = RUN_FOOTNOTE_REF;
-                fn_run->data.footnote.id_start = fn_ref.span.start;
-                fn_run->data.footnote.id_len = fn_ref.span.len;
+                fn_run->data.footnote.id_start = (uint32_t)fn_ref.span.start;
+                fn_run->data.footnote.id_len = (uint16_t)fn_ref.span.len;
             }
 
             pos += fn_ref.total_len;
@@ -1704,9 +1704,9 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
             if (pos > run_start) {
                 InlineRun* run = result_add_run(result);
                 if (run) {
-                    run->byte_start = run_start;
-                    run->byte_end = pos;
-                    run->style = run_style;
+                    run->byte_start = (uint32_t)run_start;
+                    run->byte_end = (uint32_t)pos;
+                    run->style = (uint16_t)run_style;
                     run->type = RUN_TEXT;
                 }
             }
@@ -1714,12 +1714,12 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
             // Add math run
             InlineRun* math_run = result_add_run(result);
             if (math_run) {
-                math_run->byte_start = pos;
-                math_run->byte_end = pos + inline_math.total_len;
-                math_run->style = active_style;
+                math_run->byte_start = (uint32_t)pos;
+                math_run->byte_end = (uint32_t)(pos + inline_math.total_len);
+                math_run->style = (uint16_t)active_style;
                 math_run->type = RUN_INLINE_MATH;
-                math_run->data.math.content_start = inline_math.span.start;
-                math_run->data.math.content_len = inline_math.span.len;
+                math_run->data.math.content_start = (uint32_t)inline_math.span.start;
+                math_run->data.math.content_len = (uint16_t)inline_math.span.len;
             }
 
             pos += inline_math.total_len;
@@ -1736,9 +1736,9 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
                 if (pos > run_start) {
                     InlineRun* run = result_add_run(result);
                     if (run) {
-                        run->byte_start = run_start;
-                        run->byte_end = pos;
-                        run->style = run_style;
+                        run->byte_start = (uint32_t)run_start;
+                        run->byte_end = (uint32_t)pos;
+                        run->style = (uint16_t)run_style;
                         run->type = RUN_TEXT;
                     }
                 }
@@ -1746,12 +1746,12 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
                 // Add heading ID run
                 InlineRun* hid_run = result_add_run(result);
                 if (hid_run) {
-                    hid_run->byte_start = pos;
-                    hid_run->byte_end = pos + hid.total_len;
-                    hid_run->style = active_style;
+                    hid_run->byte_start = (uint32_t)pos;
+                    hid_run->byte_end = (uint32_t)(pos + hid.total_len);
+                    hid_run->style = (uint16_t)active_style;
                     hid_run->type = RUN_HEADING_ID;
-                    hid_run->data.heading_id.id_start = hid.span.start;
-                    hid_run->data.heading_id.id_len = hid.span.len;
+                    hid_run->data.heading_id.id_start = (uint32_t)hid.span.start;
+                    hid_run->data.heading_id.id_len = (uint16_t)hid.span.len;
                 }
 
                 pos += hid.total_len;
@@ -1770,9 +1770,9 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
                 if (pos > run_start) {
                     InlineRun* run = result_add_run(result);
                     if (run) {
-                        run->byte_start = run_start;
-                        run->byte_end = pos;
-                        run->style = run_style;
+                        run->byte_start = (uint32_t)run_start;
+                        run->byte_end = (uint32_t)pos;
+                        run->style = (uint16_t)run_style;
                         run->type = RUN_TEXT;
                     }
                 }
@@ -1780,9 +1780,9 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
                 // Add emoji run
                 InlineRun* emoji_run = result_add_run(result);
                 if (emoji_run) {
-                    emoji_run->byte_start = pos;
-                    emoji_run->byte_end = pos + emoji_match.total_len;
-                    emoji_run->style = active_style;
+                    emoji_run->byte_start = (uint32_t)pos;
+                    emoji_run->byte_end = (uint32_t)(pos + emoji_match.total_len);
+                    emoji_run->style = (uint16_t)active_style;
                     emoji_run->type = RUN_EMOJI;
                     emoji_run->data.emoji.emoji = emoji_str;
                 }
@@ -1813,9 +1813,9 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
                 if (pos > run_start) {
                     InlineRun* run = result_add_run(result);
                     if (run) {
-                        run->byte_start = run_start;
-                        run->byte_end = pos;
-                        run->style = run_style;
+                        run->byte_start = (uint32_t)run_start;
+                        run->byte_end = (uint32_t)pos;
+                        run->style = (uint16_t)run_style;
                         run->type = RUN_TEXT;
                     }
                 }
@@ -1823,12 +1823,12 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
                 // Add closing delimiter run
                 InlineRun* delim_run = result_add_run(result);
                 if (delim_run) {
-                    delim_run->byte_start = pos;
+                    delim_run->byte_start = (uint32_t)pos;
                     delim_run->byte_end = (uint32_t)(pos + dlen);
                     delim_run->style = 0;
                     delim_run->type = RUN_DELIM;
                     delim_run->flags = 0; // closing delimiter
-                    delim_run->data.delim.delim_style = delim;
+                    delim_run->data.delim.delim_style = (uint16_t)delim;
                     delim_run->data.delim.dlen = (uint8_t)dlen;
                 }
 
@@ -1852,9 +1852,9 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
                     if (pos > run_start) {
                         InlineRun* run = result_add_run(result);
                         if (run) {
-                            run->byte_start = run_start;
-                            run->byte_end = pos;
-                            run->style = run_style;
+                            run->byte_start = (uint32_t)run_start;
+                            run->byte_end = (uint32_t)pos;
+                            run->style = (uint16_t)run_style;
                             run->type = RUN_TEXT;
                         }
                     }
@@ -1867,7 +1867,7 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
                         delim_run->style = 0;
                         delim_run->type = RUN_DELIM;
                         delim_run->flags = INLINE_FLAG_IS_OPEN;
-                        delim_run->data.delim.delim_style = delim;
+                        delim_run->data.delim.delim_style = (uint16_t)delim;
                         delim_run->data.delim.dlen = (uint8_t)dlen;
                     }
 
@@ -1894,9 +1894,9 @@ static void parse_inline_content(InlineParseResult* result, const GapBuffer* gb,
     if (pos > run_start) {
         InlineRun* run = result_add_run(result);
         if (run) {
-            run->byte_start = run_start;
-            run->byte_end = pos;
-            run->style = run_style;
+            run->byte_start = (uint32_t)run_start;
+            run->byte_end = (uint32_t)pos;
+            run->style = (uint16_t)run_style;
             run->type = RUN_TEXT;
         }
     }

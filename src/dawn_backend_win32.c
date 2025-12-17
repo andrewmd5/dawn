@@ -35,9 +35,11 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <shellapi.h>
 #include <winhttp.h>
 
 #pragma comment(lib, "winhttp.lib")
+#pragma comment(lib, "shell32.lib")
 
 // UTF-8 to UTF-16 conversion helper
 static wchar_t* utf8_to_wide(const char* utf8)
@@ -85,47 +87,10 @@ static char* wide_to_utf8(const wchar_t* wide)
 // SVG support via dawn_svg
 #include "dawn_svg.h"
 
-#define ESC "\x1b"
-#define CSI ESC "["
-
-#define CLEAR_SCREEN CSI "2J"
-#define CLEAR_LINE CSI "2K"
-#define CURSOR_HOME CSI "H"
-#define CURSOR_HIDE CSI "?25l"
-#define CURSOR_SHOW CSI "?25h"
-
-#define ALT_SCREEN_ON CSI "?1049h"
-#define ALT_SCREEN_OFF CSI "?1049l"
-
-#define MOUSE_ON CSI "?1000h" CSI "?1006h"
-#define MOUSE_OFF CSI "?1000l" CSI "?1006l"
-
-#define BRACKETED_PASTE_ON CSI "?2004h"
-#define BRACKETED_PASTE_OFF CSI "?2004l"
-
-#define SYNC_START CSI "?2026h"
-#define SYNC_END CSI "?2026l"
-
-#define KITTY_KBD_PUSH CSI ">1u"
-#define KITTY_KBD_POP CSI "<u"
-
-#define UNDERLINE_CURLY CSI "4:3m"
-#define UNDERLINE_DOTTED CSI "4:4m"
-#define UNDERLINE_DASHED CSI "4:5m"
-#define UNDERLINE_OFF CSI "4:0m"
-
-#define TEXT_SIZE_OSC ESC "]66;"
-#define TEXT_SIZE_ST ESC "\\"
-
-#define RESET CSI "0m"
-#define BOLD CSI "1m"
-#define DIM CSI "2m"
-#define ITALIC CSI "3m"
-#define UNDERLINE CSI "4m"
-#define STRIKETHROUGH CSI "9m"
+// Common terminal definitions
+#include "dawn_term_common.h"
 
 // Output buffer for batching terminal writes
-#define OUTPUT_BUF_SIZE (256 * 1024)
 static char* output_buf = NULL;
 static size_t output_buf_pos = 0;
 
@@ -192,30 +157,6 @@ static inline void buf_append_char(char c)
     output_buf[output_buf_pos++] = c;
 }
 
-// Format number into buffer, returns length
-static inline int32_t format_num(char* buf, int32_t n)
-{
-    if (n < 10) {
-        buf[0] = '0' + n;
-        return 1;
-    } else if (n < 100) {
-        buf[0] = '0' + n / 10;
-        buf[1] = '0' + n % 10;
-        return 2;
-    } else {
-        int32_t len = 0;
-        char tmp[12];
-        while (n > 0) {
-            tmp[len++] = '0' + n % 10;
-            n /= 10;
-        }
-        for (int32_t i = 0; i < len; i++) {
-            buf[i] = tmp[len - 1 - i];
-        }
-        return len;
-    }
-}
-
 // Buffered printf-style output
 static void buf_printf(const char* fmt, ...)
 {
@@ -264,88 +205,35 @@ static inline void buf_cursor(int32_t row, int32_t col)
     }
 
     char seq[16];
-    seq[0] = '\x1b';
-    seq[1] = '[';
-    int32_t pos = 2;
-    pos += format_num(seq + pos, row);
-    seq[pos++] = ';';
-    pos += format_num(seq + pos, col);
-    seq[pos++] = 'H';
-    buf_append(seq, (size_t)pos);
+    int32_t len = build_cursor_seq(seq, row, col);
+    buf_append(seq, (size_t)len);
 }
 
 // Fast path: foreground color
 static inline void buf_fg(uint8_t r, uint8_t g, uint8_t b)
 {
     char seq[24];
-    seq[0] = '\x1b';
-    seq[1] = '[';
-    seq[2] = '3';
-    seq[3] = '8';
-    seq[4] = ';';
-    seq[5] = '2';
-    seq[6] = ';';
-    int32_t pos = 7;
-    pos += format_num(seq + pos, r);
-    seq[pos++] = ';';
-    pos += format_num(seq + pos, g);
-    seq[pos++] = ';';
-    pos += format_num(seq + pos, b);
-    seq[pos++] = 'm';
-    buf_append(seq, (size_t)pos);
+    int32_t len = build_fg_seq(seq, r, g, b);
+    buf_append(seq, (size_t)len);
 }
 
 // Fast path: background color
 static inline void buf_bg(uint8_t r, uint8_t g, uint8_t b)
 {
     char seq[24];
-    seq[0] = '\x1b';
-    seq[1] = '[';
-    seq[2] = '4';
-    seq[3] = '8';
-    seq[4] = ';';
-    seq[5] = '2';
-    seq[6] = ';';
-    int32_t pos = 7;
-    pos += format_num(seq + pos, r);
-    seq[pos++] = ';';
-    pos += format_num(seq + pos, g);
-    seq[pos++] = ';';
-    pos += format_num(seq + pos, b);
-    seq[pos++] = 'm';
-    buf_append(seq, (size_t)pos);
+    int32_t len = build_bg_seq(seq, r, g, b);
+    buf_append(seq, (size_t)len);
 }
 
 // Fast path: underline color
 static inline void buf_underline_color(uint8_t r, uint8_t g, uint8_t b)
 {
     char seq[24];
-    seq[0] = '\x1b';
-    seq[1] = '[';
-    seq[2] = '5';
-    seq[3] = '8';
-    seq[4] = ':';
-    seq[5] = '2';
-    seq[6] = ':';
-    seq[7] = ':';
-    int32_t pos = 8;
-    pos += format_num(seq + pos, r);
-    seq[pos++] = ':';
-    pos += format_num(seq + pos, g);
-    seq[pos++] = ':';
-    pos += format_num(seq + pos, b);
-    seq[pos++] = 'm';
-    buf_append(seq, (size_t)pos);
+    int32_t len = build_underline_color_seq(seq, r, g, b);
+    buf_append(seq, (size_t)len);
 }
 
 // Image cache for Kitty graphics protocol
-typedef struct {
-    char* path;
-    uint32_t image_id;
-    int64_t mtime;
-} TransmittedImage;
-
-#define MAX_TRANSMITTED_IMAGES 8
 static TransmittedImage transmitted_images[MAX_TRANSMITTED_IMAGES];
 static int32_t transmitted_count = 0;
 static uint32_t next_image_id = 1;
@@ -480,41 +368,6 @@ static bool query_kitty_graphics(void)
     return len > 0 && strstr(buf, "OK") != NULL;
 }
 
-static bool parse_cpr(const char* buf, size_t len, int32_t* row, int32_t* col)
-{
-    if (len < 6)
-        return false;
-
-    const char* p = buf;
-    const char* end = buf + len;
-
-    while (p < end - 1 && !(p[0] == '\x1b' && p[1] == '['))
-        p++;
-    if (p >= end - 1)
-        return false;
-    p += 2;
-
-    *row = 0;
-    while (p < end && *p >= '0' && *p <= '9') {
-        *row = *row * 10 + (*p - '0');
-        p++;
-    }
-
-    if (p >= end || *p != ';')
-        return false;
-    p++;
-
-    *col = 0;
-    while (p < end && *p >= '0' && *p <= '9') {
-        *col = *col * 10 + (*p - '0');
-        p++;
-    }
-
-    if (p >= end || *p != 'R')
-        return false;
-    return (*row > 0 && *col > 0);
-}
-
 static bool query_background_color(DawnColor* out)
 {
     if (!out)
@@ -557,7 +410,7 @@ static bool query_text_sizing(void)
     size_t len1 = read_response(buf1, sizeof(buf1), 'R', 100);
 
     int32_t row1, col1;
-    if (!parse_cpr(buf1, len1, &row1, &col1))
+    if (!term_parse_cpr(buf1, len1, &row1, &col1))
         return false;
 
     query_write(ESC "]66;w=2; " ESC "\\", sizeof(ESC "]66;w=2; " ESC "\\") - 1);
@@ -568,7 +421,7 @@ static bool query_text_sizing(void)
     size_t len2 = read_response(buf2, sizeof(buf2), 'R', 100);
 
     int32_t row2, col2;
-    if (!parse_cpr(buf2, len2, &row2, &col2))
+    if (!term_parse_cpr(buf2, len2, &row2, &col2))
         return false;
 
     return (row1 == row2 && col2 - col1 == 2);
@@ -1157,206 +1010,14 @@ static void win32_link_end(void)
 static char vt_buf[64];
 static int32_t vt_buf_len = 0;
 
+//! Parse VT sequence using common parser, updating mouse state
 static int32_t parse_vt_sequence(void)
 {
-    if (vt_buf_len < 2 || vt_buf[0] != '\x1b')
-        return DAWN_KEY_NONE;
-
-    if (vt_buf[1] == '[') {
-        // SGR mouse events
-        if (vt_buf_len >= 3 && vt_buf[2] == '<') {
-            char* end = memchr(vt_buf + 3, 'M', vt_buf_len - 3);
-            if (!end)
-                end = memchr(vt_buf + 3, 'm', vt_buf_len - 3);
-            if (end) {
-                int32_t btn = 0, mx = 0, my = 0;
-                if (sscanf(vt_buf + 3, "%d;%d;%d", &btn, &mx, &my) == 3) {
-                    win32_state.last_mouse_col = mx;
-                    win32_state.last_mouse_row = my;
-                    if (btn == 64)
-                        return DAWN_KEY_MOUSE_SCROLL_UP;
-                    if (btn == 65)
-                        return DAWN_KEY_MOUSE_SCROLL_DOWN;
-                    if (btn == 0)
-                        return DAWN_KEY_MOUSE_CLICK;
-                }
-            }
-            return DAWN_KEY_NONE;
-        }
-
-        // Kitty keyboard protocol
-        if (vt_buf_len >= 3 && vt_buf[2] >= '0' && vt_buf[2] <= '9') {
-            char* u_pos = memchr(vt_buf + 2, 'u', vt_buf_len - 2);
-            if (u_pos) {
-                int32_t keycode = 0, mods = 1;
-                sscanf(vt_buf + 2, "%d;%d", &keycode, &mods);
-
-                bool shift = (mods - 1) & 1;
-                bool alt = (mods - 1) & 2;
-                bool ctrl = (mods - 1) & 4;
-
-                switch (keycode) {
-                case 57352:
-                    return shift ? DAWN_KEY_SHIFT_UP : DAWN_KEY_UP;
-                case 57353:
-                    return shift ? DAWN_KEY_SHIFT_DOWN : DAWN_KEY_DOWN;
-                case 57351:
-                    if (alt && shift)
-                        return DAWN_KEY_ALT_SHIFT_RIGHT;
-                    if (alt)
-                        return DAWN_KEY_ALT_RIGHT;
-                    if (ctrl && shift)
-                        return DAWN_KEY_CTRL_SHIFT_RIGHT;
-                    if (ctrl)
-                        return DAWN_KEY_CTRL_RIGHT;
-                    if (shift)
-                        return DAWN_KEY_SHIFT_RIGHT;
-                    return DAWN_KEY_RIGHT;
-                case 57350:
-                    if (alt && shift)
-                        return DAWN_KEY_ALT_SHIFT_LEFT;
-                    if (alt)
-                        return DAWN_KEY_ALT_LEFT;
-                    if (ctrl && shift)
-                        return DAWN_KEY_CTRL_SHIFT_LEFT;
-                    if (ctrl)
-                        return DAWN_KEY_CTRL_LEFT;
-                    if (shift)
-                        return DAWN_KEY_SHIFT_LEFT;
-                    return DAWN_KEY_LEFT;
-                case 57360:
-                    return ctrl ? DAWN_KEY_CTRL_HOME : DAWN_KEY_HOME;
-                case 57367:
-                    return ctrl ? DAWN_KEY_CTRL_END : DAWN_KEY_END;
-                case 57362:
-                    return DAWN_KEY_DEL;
-                case 57365:
-                    return DAWN_KEY_PGUP;
-                case 57366:
-                    return DAWN_KEY_PGDN;
-                case 9:
-                    return shift ? DAWN_KEY_BTAB : '\t';
-                case 13:
-                    return '\r';
-                case 27:
-                    return '\x1b';
-                case 127:
-                    return 127;
-                }
-
-                if (keycode >= 32 && keycode < 127) {
-                    if (ctrl && keycode == '/')
-                        return 31;
-                    if (ctrl && keycode >= 'a' && keycode <= 'z')
-                        return keycode - 'a' + 1;
-                    if (ctrl && keycode >= 'A' && keycode <= 'Z')
-                        return keycode - 'A' + 1;
-                    return keycode;
-                }
-                return DAWN_KEY_NONE;
-            }
-
-            // Legacy CSI sequences
-            char* tilde = memchr(vt_buf + 2, '~', vt_buf_len - 2);
-            if (tilde) {
-                int32_t num = 0;
-                sscanf(vt_buf + 2, "%d", &num);
-                switch (num) {
-                case 1:
-                    return DAWN_KEY_HOME;
-                case 3:
-                    return DAWN_KEY_DEL;
-                case 4:
-                    return DAWN_KEY_END;
-                case 5:
-                    return DAWN_KEY_PGUP;
-                case 6:
-                    return DAWN_KEY_PGDN;
-                }
-                return DAWN_KEY_NONE;
-            }
-
-            // Modified arrow keys
-            int32_t num1 = 0, num2 = 0;
-            char termchar = 0;
-            if (sscanf(vt_buf + 2, "%d;%d%c", &num1, &num2, &termchar) == 3) {
-                bool shift = (num2 == 2 || num2 == 4 || num2 == 6 || num2 == 8);
-                bool ctrl = (num2 == 5 || num2 == 6 || num2 == 7 || num2 == 8);
-                bool alt = (num2 == 3 || num2 == 4 || num2 == 7 || num2 == 8);
-
-                switch (termchar) {
-                case 'A':
-                    return shift ? DAWN_KEY_SHIFT_UP : DAWN_KEY_UP;
-                case 'B':
-                    return shift ? DAWN_KEY_SHIFT_DOWN : DAWN_KEY_DOWN;
-                case 'C':
-                    if (alt && shift)
-                        return DAWN_KEY_ALT_SHIFT_RIGHT;
-                    if (alt)
-                        return DAWN_KEY_ALT_RIGHT;
-                    if (ctrl && shift)
-                        return DAWN_KEY_CTRL_SHIFT_RIGHT;
-                    if (ctrl)
-                        return DAWN_KEY_CTRL_RIGHT;
-                    if (shift)
-                        return DAWN_KEY_SHIFT_RIGHT;
-                    return DAWN_KEY_RIGHT;
-                case 'D':
-                    if (alt && shift)
-                        return DAWN_KEY_ALT_SHIFT_LEFT;
-                    if (alt)
-                        return DAWN_KEY_ALT_LEFT;
-                    if (ctrl && shift)
-                        return DAWN_KEY_CTRL_SHIFT_LEFT;
-                    if (ctrl)
-                        return DAWN_KEY_CTRL_LEFT;
-                    if (shift)
-                        return DAWN_KEY_SHIFT_LEFT;
-                    return DAWN_KEY_LEFT;
-                case 'H':
-                    return ctrl ? DAWN_KEY_CTRL_HOME : DAWN_KEY_HOME;
-                case 'F':
-                    return ctrl ? DAWN_KEY_CTRL_END : DAWN_KEY_END;
-                }
-            }
-        }
-
-        // Simple arrow keys
-        if (vt_buf_len == 3) {
-            switch (vt_buf[2]) {
-            case 'A':
-                return DAWN_KEY_UP;
-            case 'B':
-                return DAWN_KEY_DOWN;
-            case 'C':
-                return DAWN_KEY_RIGHT;
-            case 'D':
-                return DAWN_KEY_LEFT;
-            case 'H':
-                return DAWN_KEY_HOME;
-            case 'F':
-                return DAWN_KEY_END;
-            case 'Z':
-                return DAWN_KEY_BTAB;
-            }
-        }
-    } else if (vt_buf[1] == 'O' && vt_buf_len == 3) {
-        switch (vt_buf[2]) {
-        case 'H':
-            return DAWN_KEY_HOME;
-        case 'F':
-            return DAWN_KEY_END;
-        }
-    } else if (vt_buf_len == 2) {
-        // Alt+key
-        if (vt_buf[1] == 'b')
-            return DAWN_KEY_ALT_LEFT;
-        if (vt_buf[1] == 'f')
-            return DAWN_KEY_ALT_RIGHT;
-    }
-
-    return DAWN_KEY_NONE;
+    return term_parse_vt(vt_buf, vt_buf_len, &win32_state.last_mouse_col, &win32_state.last_mouse_row);
 }
+
+// Pending high surrogate for surrogate pair handling
+static wchar_t pending_high_surrogate = 0;
 
 static int32_t win32_read_key(void)
 {
@@ -1369,7 +1030,7 @@ static int32_t win32_read_key(void)
         if (!GetNumberOfConsoleInputEvents(win32_state.h_stdin, &avail) || avail == 0)
             return DAWN_KEY_NONE;
 
-        if (!ReadConsoleInputA(win32_state.h_stdin, &rec, 1, &read) || read == 0)
+        if (!ReadConsoleInputW(win32_state.h_stdin, &rec, 1, &read) || read == 0)
             return DAWN_KEY_NONE;
 
         // Window resize event
@@ -1398,16 +1059,30 @@ static int32_t win32_read_key(void)
             continue;
 
         KEY_EVENT_RECORD* ker = &rec.Event.KeyEvent;
-        char c = ker->uChar.AsciiChar;
+        wchar_t wc = ker->uChar.UnicodeChar;
         WORD vk = ker->wVirtualKeyCode;
         DWORD ctrl_state = ker->dwControlKeyState;
         bool shift = (ctrl_state & SHIFT_PRESSED) != 0;
         bool ctrl = (ctrl_state & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)) != 0;
         bool alt = (ctrl_state & (LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED)) != 0;
 
+        // Handle surrogate pairs for characters outside BMP (e.g., emoji)
+        if (wc >= 0xD800 && wc <= 0xDBFF) {
+            // High surrogate - save and wait for low surrogate
+            pending_high_surrogate = wc;
+            continue;
+        }
+        if (wc >= 0xDC00 && wc <= 0xDFFF && pending_high_surrogate != 0) {
+            // Low surrogate - combine with high surrogate
+            int32_t codepoint = 0x10000 + ((pending_high_surrogate - 0xD800) << 10) + (wc - 0xDC00);
+            pending_high_surrogate = 0;
+            return codepoint;
+        }
+        pending_high_surrogate = 0;
+
         // Handle VT sequences from terminal emulators
-        if (c == '\x1b') {
-            vt_buf[0] = c;
+        if (wc == L'\x1b') {
+            vt_buf[0] = '\x1b';
             vt_buf_len = 1;
 
             // Try to read more of the sequence
@@ -1421,16 +1096,17 @@ static int32_t win32_read_key(void)
                     continue;
                 }
 
-                if (!ReadConsoleInputA(win32_state.h_stdin, &rec, 1, &read) || read == 0)
+                if (!ReadConsoleInputW(win32_state.h_stdin, &rec, 1, &read) || read == 0)
                     break;
 
                 if (rec.EventType != KEY_EVENT || !rec.Event.KeyEvent.bKeyDown)
                     continue;
 
-                char nc = rec.Event.KeyEvent.uChar.AsciiChar;
-                if (nc == 0)
-                    break;
+                wchar_t nwc = rec.Event.KeyEvent.uChar.UnicodeChar;
+                if (nwc == 0 || nwc > 127)
+                    break; // VT sequences are ASCII only
 
+                char nc = (char)nwc;
                 vt_buf[vt_buf_len++] = nc;
 
                 // Check for sequence terminators
@@ -1448,6 +1124,8 @@ static int32_t win32_read_key(void)
                 int32_t key = parse_vt_sequence();
                 if (key != DAWN_KEY_NONE)
                     return key;
+                // Valid sequence but no key to return (e.g. bracketed paste markers)
+                continue;
             }
             return '\x1b';
         }
@@ -1514,9 +1192,9 @@ static int32_t win32_read_key(void)
             return 31;
         }
 
-        // Regular character
-        if (c != 0) {
-            return (uint8_t)c;
+        // Regular character - return Unicode code point
+        if (wc != 0) {
+            return (int32_t)wc;
         }
     }
 }
@@ -1804,10 +1482,26 @@ static bool win32_delete_file(const char* path)
 
 static void win32_reveal_in_explorer(const char* path)
 {
-    char cmd[1024];
-    snprintf(cmd, sizeof(cmd), "explorer /select,\"%s\"", path);
-    int32_t r = system(cmd);
-    (void)r;
+    if (!path || !*path)
+        return;
+
+    // Convert to wide string and normalize path separators
+    wchar_t* wpath = utf8_to_wide(path);
+    if (!wpath)
+        return;
+
+    // Convert forward slashes to backslashes
+    for (wchar_t* p = wpath; *p; p++) {
+        if (*p == L'/')
+            *p = L'\\';
+    }
+
+    // Use ShellExecuteW to open explorer with file selected
+    wchar_t params[1024];
+    _snwprintf(params, sizeof(params)/sizeof(params[0]), L"/select,\"%s\"", wpath);
+    ShellExecuteW(NULL, L"open", L"explorer.exe", params, NULL, SW_SHOWNORMAL);
+
+    free(wpath);
 }
 
 static int64_t win32_clock(DawnClock kind)
@@ -1894,63 +1588,6 @@ static const char* win32_get_username(void)
     return name;
 }
 
-static const char b64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-static char* base64_encode(const uint8_t* data, size_t input_len, size_t* output_len)
-{
-    if (input_len > (SIZE_MAX - 2) / 4 * 3)
-        return NULL;
-
-    size_t encoded_len = 4 * ((input_len + 2) / 3);
-    char* encoded = malloc(encoded_len + 1);
-    if (!encoded)
-        return NULL;
-
-    size_t i, j;
-    for (i = 0, j = 0; i < input_len;) {
-        uint32_t octet_a = i < input_len ? data[i++] : 0;
-        uint32_t octet_b = i < input_len ? data[i++] : 0;
-        uint32_t octet_c = i < input_len ? data[i++] : 0;
-        uint32_t triple = (octet_a << 16) | (octet_b << 8) | octet_c;
-        encoded[j++] = b64_table[(triple >> 18) & 0x3F];
-        encoded[j++] = b64_table[(triple >> 12) & 0x3F];
-        encoded[j++] = b64_table[(triple >> 6) & 0x3F];
-        encoded[j++] = b64_table[triple & 0x3F];
-    }
-
-    int32_t mod = (int32_t)(input_len % 3);
-    if (mod > 0) {
-        encoded[encoded_len - 1] = '=';
-        if (mod == 1)
-            encoded[encoded_len - 2] = '=';
-    }
-
-    encoded[encoded_len] = '\0';
-    *output_len = encoded_len;
-    return encoded;
-}
-
-static bool win32_image_is_supported(const char* path)
-{
-    if (!path)
-        return false;
-    const char* ext = strrchr(path, '.');
-    if (!ext)
-        return false;
-    ext++;
-
-    char lower[16];
-    size_t i;
-    for (i = 0; i < sizeof(lower) - 1 && ext[i]; i++) {
-        lower[i] = (ext[i] >= 'A' && ext[i] <= 'Z') ? (ext[i] | 32) : ext[i];
-    }
-    lower[i] = '\0';
-
-    return strcmp(lower, "png") == 0 || strcmp(lower, "jpg") == 0 ||
-           strcmp(lower, "jpeg") == 0 || strcmp(lower, "gif") == 0 ||
-           strcmp(lower, "bmp") == 0 || strcmp(lower, "svg") == 0;
-}
-
 static bool win32_image_get_size(const char* path, int32_t* out_width, int32_t* out_height)
 {
     if (!path || !out_width || !out_height)
@@ -1996,7 +1633,7 @@ static uint32_t transmit_to_terminal(const char* path)
 
     size_t path_len = strlen(abs_path);
     size_t b64_len;
-    char* b64_path = base64_encode((uint8_t*)abs_path, path_len, &b64_len);
+    char* b64_path = term_base64_encode((uint8_t*)abs_path, path_len, &b64_len);
     free(abs_path);
     if (!b64_path)
         return 0;
@@ -2146,7 +1783,7 @@ static void win32_image_mask_region(int32_t col, int32_t row, int32_t cols, int3
     uint8_t pixel[4] = { bg.r, bg.g, bg.b, 255 };
 
     size_t b64_len;
-    char* b64_data = base64_encode(pixel, 4, &b64_len);
+    char* b64_data = term_base64_encode(pixel, 4, &b64_len);
     if (!b64_data)
         return;
 
@@ -2154,24 +1791,6 @@ static void win32_image_mask_region(int32_t col, int32_t row, int32_t cols, int3
     buf_printf("\x1b_Ga=T,f=32,s=1,v=1,c=%d,r=%d,z=-1,q=2;%s\x1b\\", cols, rows, b64_data);
 
     free(b64_data);
-}
-
-// Hash function for cache keys
-static void hash_to_hex(const char* str, char* out_hex)
-{
-    uint64_t hash = 5381;
-    int32_t c;
-    while ((c = (uint8_t)*str++)) {
-        hash = ((hash << 5) + hash) + c;
-    }
-    snprintf(out_hex, 65, "%016llx", (unsigned long long)hash);
-}
-
-static bool is_remote_url(const char* path)
-{
-    if (!path)
-        return false;
-    return (strncmp(path, "http://", 7) == 0 || strncmp(path, "https://", 8) == 0);
 }
 
 // Async image download system using WinHTTP
@@ -2494,8 +2113,8 @@ static bool download_url_to_cache(const char* url, char* cached_path, size_t pat
     snprintf(cache_dir, sizeof(cache_dir), "%s\\.dawn\\image-cache", home);
     win32_mkdir_p(cache_dir);
 
-    char hash_hex[65];
-    hash_to_hex(url, hash_hex);
+    char hash_hex[17];
+    term_hash_to_hex(url, hash_hex);
 
     snprintf(cached_path, path_size, "%s\\%.16s.png", cache_dir, hash_hex);
 
@@ -2571,8 +2190,8 @@ static bool ensure_png_cached(const char* src_path, char* out, size_t out_size)
     char key[MAX_PATH + 21];
     snprintf(key, sizeof(key), "%s:%lld", abs_path, (long long)mtime);
 
-    char hash_hex[65];
-    hash_to_hex(key, hash_hex);
+    char hash_hex[17];
+    term_hash_to_hex(key, hash_hex);
 
     snprintf(out, out_size, "%s\\%.16s.png", cache_dir, hash_hex);
 
@@ -2620,7 +2239,7 @@ static bool win32_image_resolve_path(const char* raw_path, const char* base_dir,
     if (!raw_path || !out || out_size == 0)
         return false;
 
-    if (is_remote_url(raw_path)) {
+    if (term_is_remote_url(raw_path)) {
         return download_url_to_cache(raw_path, out, out_size);
     }
 
@@ -2780,7 +2399,7 @@ const DawnBackend dawn_backend_win32 = {
     .username = win32_get_username,
 
     // Images
-    .img_supported = win32_image_is_supported,
+    .img_supported = term_image_is_supported,
     .img_size = win32_image_get_size,
     .img_display = win32_image_display,
     .img_display_cropped = win32_image_display_cropped,
