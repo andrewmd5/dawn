@@ -26,6 +26,7 @@ endif()
 
 file(GLOB DAWN_SRCS src/dawn*.c)
 list(FILTER DAWN_SRCS EXCLUDE REGEX "dawn_backend_.*\\.c$")
+list(FILTER DAWN_SRCS EXCLUDE REGEX "dawn_compat\\.c$")
 file(GLOB HIGHLIGHT_SRCS src/highlight/*.c src/highlight/lang/*.c)
 
 set(PCRE2_BUILD_PCRE2GREP OFF CACHE BOOL "" FORCE)
@@ -55,12 +56,16 @@ if(NOT EMSCRIPTEN)
         set(DAWN_BACKEND_SRC src/dawn_backend_posix.c)
     endif()
 
+    if(WIN32)
+        set(DAWN_COMPAT_SRC src/dawn_compat.c)
+    endif()
+
     add_executable(dawn
         ${DAWN_SRCS}
         ${HIGHLIGHT_SRCS}
         ${DAWN_BACKEND_SRC}
+        ${DAWN_COMPAT_SRC}
         src/main_term.c
-        src/dawn_compat.c
         third-party/cJSON.c
     )
 
