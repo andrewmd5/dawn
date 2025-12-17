@@ -10,13 +10,23 @@
 
 // #region Assert
 
+#ifdef _MSC_VER
 #define DAWN_ASSERT(cond, fmt, ...)                                                                                    \
     do {                                                                                                               \
         if (!(cond)) {                                                                                                 \
-            fprintf(stderr, "fatal: " fmt " (%s:%d)\n" __VA_OPT__(, ) __VA_ARGS__, __FILE__, __LINE__);                \
+            fprintf(stderr, "fatal: " fmt " (%s:%d)\n", __VA_ARGS__, __FILE__, __LINE__);                              \
             abort();                                                                                                   \
         }                                                                                                              \
     } while (0)
+#else
+#define DAWN_ASSERT(cond, fmt, ...)                                                                                    \
+    do {                                                                                                               \
+        if (!(cond)) {                                                                                                 \
+            fprintf(stderr, "fatal: " fmt " (%s:%d)\n", ##__VA_ARGS__, __FILE__, __LINE__);                            \
+            abort();                                                                                                   \
+        }                                                                                                              \
+    } while (0)
+#endif
 
 // #endregion
 
