@@ -3,6 +3,17 @@
 #ifndef DAWN_TYPES_H
 #define DAWN_TYPES_H
 
+// #region Windows Compatibility
+
+#ifdef _WIN32
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+#define strdup _strdup
+#endif
+
+// #endregion
+
 // #region Standard Library Includes (Platform-Independent)
 
 #include <limits.h>

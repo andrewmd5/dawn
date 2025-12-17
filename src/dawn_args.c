@@ -1,16 +1,16 @@
 // dawn_args.c
 
+#ifndef _WIN32
 #define _POSIX_C_SOURCE 200809L
+#endif
 
 #include "dawn_args.h"
+#include "dawn_compat.h"
 #include "dawn_types.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
-#include <sys/select.h>
-#include <unistd.h>
 
 // #region Option Definitions
 
@@ -257,6 +257,10 @@ bool args_stdin_has_data(void)
         return false;
     }
 
+#ifdef _WIN32
+    // On Windows, if not a tty, assume piped input
+    return true;
+#else
     // Check if there's data available
     fd_set fds;
     struct timeval tv = { 0, 0 };
@@ -265,6 +269,7 @@ bool args_stdin_has_data(void)
     FD_SET(STDIN_FILENO, &fds);
 
     return select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) > 0;
+#endif
 }
 
 char* args_read_stdin(size_t* out_size)
