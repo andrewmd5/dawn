@@ -1605,6 +1605,12 @@ static void web_image_invalidate(const char* path)
             delete window.dawnImages[path];
        }}, path);
 }
+
+static void web_on_shutdown(void (*callback)(void))
+{
+    (void)callback;
+}
+
 // clang-format on
 
 const DawnBackend dawn_backend_web = {
@@ -1669,6 +1675,7 @@ const DawnBackend dawn_backend_web = {
     .mtime = web_get_mtime,
     .rm = web_delete_file,
     .reveal = web_reveal_in_finder,
+    .on_shutdown = web_on_shutdown,
 
     // Time
     .clock = web_clock,

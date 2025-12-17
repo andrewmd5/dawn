@@ -174,6 +174,9 @@ typedef struct DawnBackend {
     bool (*rm)(const char* path);
     void (*reveal)(const char* path);
 
+    // Shutdown events
+    void (*on_shutdown)(void (*callback)(void));
+
     // Time
     int64_t (*clock)(DawnClock kind);
     void (*sleep_ms)(int32_t ms);

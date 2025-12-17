@@ -245,6 +245,8 @@ static bool win32_file_exists(const char* path);
 static char* win32_read_file(const char* path, size_t* out_len);
 static bool win32_mkdir_p(const char* path);
 static const char* win32_get_home_dir(void);
+static void win32_install_shutdown_handlers(void);
+static void win32_fire_shutdown_callbacks(void);
 
 //! Get handles for terminal queries
 static inline HANDLE get_query_write_handle(void)
@@ -497,6 +499,8 @@ static bool win32_init(DawnMode mode)
     win32_state.h_conin = INVALID_HANDLE_VALUE;
     win32_state.h_conout = INVALID_HANDLE_VALUE;
 
+    win32_install_shutdown_handlers();
+
     // Allocate output buffer
     if (!output_buf) {
         output_buf = malloc(OUTPUT_BUF_SIZE);
@@ -634,6 +638,8 @@ static void win32_shutdown(void)
 {
     if (!win32_state.initialized)
         return;
+
+    win32_fire_shutdown_callbacks();
 
     DWORD written;
 
@@ -2328,6 +2334,50 @@ static void win32_execute_pending_jobs(void)
     poll_downloads();
 }
 
+// Shutdown callback system
+#define MAX_SHUTDOWN_CALLBACKS 8
+static void (*win32_shutdown_callbacks[MAX_SHUTDOWN_CALLBACKS])(void);
+static int32_t win32_shutdown_callback_count = 0;
+
+static void win32_on_shutdown(void (*callback)(void))
+{
+    if (callback && win32_shutdown_callback_count < MAX_SHUTDOWN_CALLBACKS) {
+        win32_shutdown_callbacks[win32_shutdown_callback_count++] = callback;
+    }
+}
+
+static void win32_fire_shutdown_callbacks(void)
+{
+    for (int32_t i = 0; i < win32_shutdown_callback_count; i++) {
+        if (win32_shutdown_callbacks[i])
+            win32_shutdown_callbacks[i]();
+    }
+}
+
+static BOOL WINAPI win32_shutdown_ctrl_handler(DWORD ctrl_type)
+{
+    switch (ctrl_type) {
+    case CTRL_C_EVENT:
+    case CTRL_BREAK_EVENT:
+    case CTRL_CLOSE_EVENT:
+    case CTRL_LOGOFF_EVENT:
+    case CTRL_SHUTDOWN_EVENT:
+        win32_fire_shutdown_callbacks();
+        break;
+    }
+    return FALSE;
+}
+
+static void win32_install_shutdown_handlers(void)
+{
+    static bool installed = false;
+    if (installed)
+        return;
+    installed = true;
+
+    SetConsoleCtrlHandler(win32_shutdown_ctrl_handler, TRUE);
+}
+
 const DawnBackend dawn_backend_win32 = {
     .name = "win32",
 
@@ -2390,6 +2440,7 @@ const DawnBackend dawn_backend_win32 = {
     .mtime = win32_get_mtime,
     .rm = win32_delete_file,
     .reveal = win32_reveal_in_explorer,
+    .on_shutdown = win32_on_shutdown,
 
     // Time
     .clock = win32_clock,

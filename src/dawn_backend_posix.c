@@ -129,8 +129,10 @@ static void buf_printf(const char* fmt, ...)
     }
 }
 
-// Forward declaration for use in buf_cursor
+// Forward declarations
 static inline void buf_bg(uint8_t r, uint8_t g, uint8_t b);
+static void posix_install_shutdown_handlers(void);
+static void posix_fire_shutdown_callbacks(void);
 
 // Fast path: cursor positioning - \x1b[row;colH
 static inline void buf_cursor(int32_t row, int32_t col)
@@ -202,7 +204,6 @@ static TransmittedImage transmitted_images[MAX_TRANSMITTED_IMAGES];
 static int32_t transmitted_count = 0;
 static uint32_t next_image_id = 1;
 
-// Forward declarations
 static int32_t posix_image_calc_rows(int32_t pixel_width, int32_t pixel_height, int32_t max_cols, int32_t max_rows);
 
 static void handle_sigwinch(int32_t sig)
@@ -452,6 +453,8 @@ static bool posix_init(DawnMode mode)
     posix_state.mode = mode;
     posix_state.tty_fd = -1;
 
+    posix_install_shutdown_handlers();
+
     // Allocate output buffer
     if (!output_buf) {
         output_buf = malloc(OUTPUT_BUF_SIZE);
@@ -580,6 +583,8 @@ static void posix_shutdown(void)
 {
     if (!posix_state.initialized)
         return;
+
+    posix_fire_shutdown_callbacks();
 
     if (posix_state.mode == DAWN_MODE_PRINT) {
         // Print mode cleanup: just close tty_fd if we opened it
@@ -2274,6 +2279,50 @@ static void posix_execute_pending_jobs(void)
     poll_downloads();
 }
 
+// Shutdown callback system
+#define MAX_SHUTDOWN_CALLBACKS 8
+static void (*shutdown_callbacks[MAX_SHUTDOWN_CALLBACKS])(void);
+static int32_t shutdown_callback_count = 0;
+
+static void posix_on_shutdown(void (*callback)(void))
+{
+    if (callback && shutdown_callback_count < MAX_SHUTDOWN_CALLBACKS) {
+        shutdown_callbacks[shutdown_callback_count++] = callback;
+    }
+}
+
+static void posix_fire_shutdown_callbacks(void)
+{
+    for (int32_t i = 0; i < shutdown_callback_count; i++) {
+        if (shutdown_callbacks[i])
+            shutdown_callbacks[i]();
+    }
+}
+
+static void posix_shutdown_signal_handler(int32_t sig)
+{
+    posix_fire_shutdown_callbacks();
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
+static void posix_install_shutdown_handlers(void)
+{
+    static bool installed = false;
+    if (installed)
+        return;
+    installed = true;
+
+    struct sigaction sa;
+    sa.sa_handler = posix_shutdown_signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESETHAND;
+
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGHUP, &sa, NULL);
+}
+
 const DawnBackend dawn_backend_posix = {
     .name = "posix",
 
@@ -2336,6 +2385,7 @@ const DawnBackend dawn_backend_posix = {
     .mtime = posix_get_mtime,
     .rm = posix_delete_file,
     .reveal = posix_reveal_in_finder,
+    .on_shutdown = posix_on_shutdown,
 
     // Time
     .clock = posix_clock,

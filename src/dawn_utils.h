@@ -5,6 +5,20 @@
 
 #include "dawn_md.h"
 #include "dawn_types.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+// #region Assert
+
+#define DAWN_ASSERT(cond, fmt, ...)                                                                                    \
+    do {                                                                                                               \
+        if (!(cond)) {                                                                                                 \
+            fprintf(stderr, "fatal: " fmt " (%s:%d)\n" __VA_OPT__(, ) __VA_ARGS__, __FILE__, __LINE__);                \
+            abort();                                                                                                   \
+        }                                                                                                              \
+    } while (0)
+
+// #endregion
 
 // #region Character Classification (ASCII)
 

@@ -25,7 +25,12 @@ char* history_dir(void)
 {
     static char path[PATH_MAX];
     const char* home = DAWN_BACKEND(app)->home_dir();
-    snprintf(path, sizeof(path), "%s/%s", home ? home : "/tmp", HISTORY_DIR_NAME);
+    DAWN_ASSERT(home, "home_dir() returned NULL");
+#ifdef _WIN32
+    snprintf(path, sizeof(path), "%s\\%s", home, HISTORY_DIR_NAME);
+#else
+    snprintf(path, sizeof(path), "%s/%s", home, HISTORY_DIR_NAME);
+#endif
     return path;
 }
 

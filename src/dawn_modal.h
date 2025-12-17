@@ -230,6 +230,39 @@
         _modal_set_cursor_visible(false); \
     } while (0)
 
+//! Render a warning/confirmation message
+//! @param row_offset Rows below field start
+//! @param text Warning text to display
+#define MODAL_WARNING(row_offset, text)                 \
+    do {                                                \
+        int32_t _row = _modal_field_row + (row_offset); \
+        move_to(_row, _modal_content_left);             \
+        set_fg(get_accent());                           \
+        _modal_write_str(text);                         \
+    } while (0)
+
+//! Render action buttons for confirmation
+//! @param row_offset Rows below field start
+//! @param confirm_key Key for confirm action (e.g., "y")
+//! @param confirm_label Label for confirm (e.g., "Delete")
+//! @param cancel_key Key for cancel action (e.g., "n")
+//! @param cancel_label Label for cancel (e.g., "Cancel")
+#define MODAL_CONFIRM_BUTTONS(row_offset, confirm_key, confirm_label, cancel_key, cancel_label) \
+    do {                                                                                        \
+        int32_t _row = _modal_field_row + (row_offset);                                         \
+        move_to(_row, _modal_content_left);                                                     \
+        set_fg(get_accent());                                                                   \
+        _modal_write_str("[");                                                                  \
+        _modal_write_str(confirm_key);                                                          \
+        _modal_write_str("] ");                                                                 \
+        _modal_write_str(confirm_label);                                                        \
+        set_fg(get_dim());                                                                      \
+        _modal_write_str("   [");                                                               \
+        _modal_write_str(cancel_key);                                                           \
+        _modal_write_str("] ");                                                                 \
+        _modal_write_str(cancel_label);                                                         \
+    } while (0)
+
 // #endregion
 
 // #region Frontmatter Editor Macros

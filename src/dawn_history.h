@@ -30,6 +30,9 @@ void hist_save(void);
 //! Free all history entries
 void hist_free(void);
 
+//! Free history and CRDT state (call on shutdown)
+void hist_shutdown(void);
+
 // #endregion
 
 // #region Operations
@@ -49,14 +52,6 @@ bool hist_remove(const char* path);
 //! @param path Full path to find
 //! @return Pointer to entry, or NULL if not found
 HistEntry* hist_find(const char* path);
-
-// #endregion
-
-// #region Migration
-
-//! Migrate from old directory-scan based history
-//! Scans .dawn/*.md files and imports them into history
-void hist_migrate_legacy(void);
 
 // #endregion
 
