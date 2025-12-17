@@ -83,20 +83,32 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dawn-*
+          path: artifacts
+
       - name: Update Homebrew formula
         run: |
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
           echo "Version: $VERSION"
 
-          # Get SHA256 for arm64 and x64 binaries
-          ARM64_URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/dawn-macos-arm64.tar.gz"
-          X64_URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/dawn-macos-x64.tar.gz"
-          ARM64_SHA=$(curl -sL "$ARM64_URL" | sha256sum | cut -d' ' -f1)
-          X64_SHA=$(curl -sL "$X64_URL" | sha256sum | cut -d' ' -f1)
+          MACOS_ARM64_SHA=$(sha256sum artifacts/dawn-macos-arm64/dawn-macos-arm64.tar.gz | cut -d' ' -f1)
+          MACOS_X64_SHA=$(sha256sum artifacts/dawn-macos-x64/dawn-macos-x64.tar.gz | cut -d' ' -f1)
+          LINUX_ARM64_SHA=$(sha256sum artifacts/dawn-linux-arm64/dawn-linux-arm64.tar.gz | cut -d' ' -f1)
+          LINUX_X64_SHA=$(sha256sum artifacts/dawn-linux-x64/dawn-linux-x64.tar.gz | cut -d' ' -f1)
 
-          echo "ARM64 SHA: $ARM64_SHA"
-          echo "X64 SHA: $X64_SHA"
+          MACOS_ARM64_URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/dawn-macos-arm64.tar.gz"
+          MACOS_X64_URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/dawn-macos-x64.tar.gz"
+          LINUX_ARM64_URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/dawn-linux-arm64.tar.gz"
+          LINUX_X64_URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/dawn-linux-x64.tar.gz"
+
+          echo "macOS ARM64 SHA: $MACOS_ARM64_SHA"
+          echo "macOS x64 SHA: $MACOS_X64_SHA"
+          echo "Linux ARM64 SHA: $LINUX_ARM64_SHA"
+          echo "Linux x64 SHA: $LINUX_X64_SHA"
 
           # Clone homebrew tap and update formula
           git clone https://x-access-token:${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/andrewmd5/homebrew-tap.git tap
@@ -110,12 +122,23 @@ jobs:
 
             on_macos do
               on_arm do
-                url "$ARM64_URL"
-                sha256 "$ARM64_SHA"
+                url "$MACOS_ARM64_URL"
+                sha256 "$MACOS_ARM64_SHA"
               end
               on_intel do
-                url "$X64_URL"
-                sha256 "$X64_SHA"
+                url "$MACOS_X64_URL"
+                sha256 "$MACOS_X64_SHA"
+              end
+            end
+
+            on_linux do
+              on_arm do
+                url "$LINUX_ARM64_URL"
+                sha256 "$LINUX_ARM64_SHA"
+              end
+              on_intel do
+                url "$LINUX_X64_URL"
+                sha256 "$LINUX_X64_SHA"
               end
             end
 

@@ -1,5 +1,5 @@
 class Dawn < Formula
-  desc "Distraction-free writing environment with live markdown rendering"
+  desc "Distraction-free terminal writing environment with live markdown rendering"
   homepage "https://github.com/andrewmd5/dawn"
   version "VERSION"
   license "MIT"
@@ -7,11 +7,22 @@ class Dawn < Formula
   on_macos do
     on_arm do
       url "https://github.com/andrewmd5/dawn/releases/download/vVERSION/dawn-macos-arm64.tar.gz"
-      sha256 "SHA256_ARM64"
+      sha256 "SHA256_MACOS_ARM64"
     end
     on_intel do
       url "https://github.com/andrewmd5/dawn/releases/download/vVERSION/dawn-macos-x64.tar.gz"
-      sha256 "SHA256_X64"
+      sha256 "SHA256_MACOS_X64"
+    end
+  end
+
+  on_linux do
+    on_arm do
+      url "https://github.com/andrewmd5/dawn/releases/download/vVERSION/dawn-linux-arm64.tar.gz"
+      sha256 "SHA256_LINUX_ARM64"
+    end
+    on_intel do
+      url "https://github.com/andrewmd5/dawn/releases/download/vVERSION/dawn-linux-x64.tar.gz"
+      sha256 "SHA256_LINUX_X64"
     end
   end
 
@@ -20,6 +31,6 @@ class Dawn < Formula
   end
 
   test do
-    assert_match "dawn", shell_output("#{bin}/dawn --help")
+    assert_match "dawn", shell_output("#{bin}/dawn -h")
   end
 end
