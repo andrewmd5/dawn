@@ -25,6 +25,14 @@ jobs:
           - os: ubuntu-24.04-arm
             target: linux-arm64
             artifact: dawn-linux-arm64
+          - os: windows-latest
+            target: windows-x64
+            artifact: dawn-windows-x64
+            arch: x64
+          - os: windows-11-arm
+            target: windows-arm64
+            artifact: dawn-windows-arm64
+            arch: ARM64
 
     runs-on: ${{ matrix.os }}
 
@@ -40,7 +48,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev
 
-      - name: Build
+      - name: Build (Unix)
+        if: "!startsWith(matrix.os, 'windows')"
         run: |
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
@@ -48,17 +57,40 @@ jobs:
           cmake --build build -j
           strip build/dawn
 
-      - name: Package
+      - name: Build (Windows)
+        if: startsWith(matrix.os, 'windows')
+        run: |
+          $VERSION = "${{ github.ref_name }}" -replace '^v', ''
+          cmake -S . -B build -A ${{ matrix.arch }} -DDAWN_VERSION="$VERSION"
+          cmake --build build --config Release
+
+      - name: Package (Unix)
+        if: "!startsWith(matrix.os, 'windows')"
         run: |
           mkdir -p dist
           cp build/dawn dist/dawn
           cd dist && tar -czvf ${{ matrix.artifact }}.tar.gz dawn
 
-      - name: Upload artifact
+      - name: Package (Windows)
+        if: startsWith(matrix.os, 'windows')
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          Copy-Item build/Release/dawn.exe dist/dawn.exe
+          Compress-Archive -Path dist/dawn.exe -DestinationPath dist/${{ matrix.artifact }}.zip
+
+      - name: Upload artifact (Unix)
+        if: "!startsWith(matrix.os, 'windows')"
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: dist/${{ matrix.artifact }}.tar.gz
+
+      - name: Upload artifact (Windows)
+        if: startsWith(matrix.os, 'windows')
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}.zip
 
   release:
     needs: build
@@ -75,7 +107,8 @@ jobs:
         run: |
           gh release create ${{ github.ref_name }} \
             --generate-notes \
-            artifacts/**/*.tar.gz
+            artifacts/**/*.tar.gz \
+            artifacts/**/*.zip
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

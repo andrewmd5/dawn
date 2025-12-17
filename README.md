@@ -145,18 +145,24 @@ An optional AI assistant panel is available (`Ctrl+/`). Useful for asking questi
 
 ## Installation
 
-### Homebrew (macOS)
+### Homebrew (macOS/Linux)
 
 ```bash
 brew tap andrewmd5/tap
 brew install dawn
 ```
 
+### PowerShell (Windows)
+
+```powershell
+irm https://raw.githubusercontent.com/andrewmd5/dawn/main/install.ps1 | iex
+```
+
 ### From Releases
 
 Download a prebuilt binary from [Releases](https://github.com/andrewmd5/dawn/releases).
 
-### From Source
+### From Source (macOS/Linux)
 
 ```bash
 git clone --recursive https://github.com/andrewmd5/dawn.git
@@ -176,6 +182,21 @@ make install  # optional, installs to /usr/local/bin
 - `make debug` - Debug build with sanitizers
 - `make web` - WebAssembly build (requires Emscripten)
 - `make with-ai` - Build with Apple Intelligence (macOS 26+)
+
+### From Source (Windows)
+
+```powershell
+git clone --recursive https://github.com/andrewmd5/dawn.git
+cd dawn
+cmake -S . -B build -G "Visual Studio 18 2026" -A ARM64  # or -A x64 for Intel/AMD
+cmake --build build --config Release
+```
+
+The executable will be at `build/Release/dawn.exe`.
+
+**Requirements:**
+- CMake 3.16+
+- Visual Studio 2026 (or newer) with C++ workload
 
 ---
 

@@ -1,33 +1,9 @@
 // dawn.c
 //! Frontends call into this via dawn_app.h API
-//
-// KNOWN ISSUES:
-// - Max undo: Undo stack has hard limit (MAX_UNDO) - oldest states silently drop
-// - Large files: No streaming/chunked rendering for very large documents
-// - Block cache: Invalidated on any edit - could be optimized for local changes
-// - Timer overflow: Timer uses int64_t timestamps, no overflow handling
-// - Footnote scan: Linear scan for footnote definitions - O(n) per check
 
 #include "dawn_app.h"
 #include "dawn_history.h"
 #include "dawn_types.h"
-
-// Debug assert - only compiles in debug builds
-#ifdef NDEBUG
-#define DAWN_ASSERT(cond, fmt, ...) ((void)0)
-#else
-#define DAWN_ASSERT(cond, fmt, ...)                                               \
-    do {                                                                          \
-        if (!(cond)) {                                                            \
-            dawn_ctx_shutdown(&app.ctx);                                          \
-            fprintf(stderr, "\r\n\033[1;31mASSERT FAILED:\033[0m %s\r\n", #cond); \
-            fprintf(stderr, "  at %s:%d\r\n", __FILE__, __LINE__);                \
-            fprintf(stderr, "  " fmt "\r\n" __VA_OPT__(, ) __VA_ARGS__);          \
-            fflush(stderr);                                                       \
-            exit(1);                                                              \
-        }                                                                         \
-    } while (0)
-#endif
 
 #include "dawn_block.h"
 #include "dawn_chat.h"
@@ -3297,11 +3273,21 @@ static void new_session(void)
     char timestamp[20];
     dawn_format_filename_time(&lt, timestamp, sizeof(timestamp));
     char path[PATH_MAX];
+#ifdef _WIN32
+    snprintf(path, sizeof(path), "%s\\%s.md", history_dir(), timestamp);
+#else
     snprintf(path, sizeof(path), "%s/%s.md", history_dir(), timestamp);
+#endif
     app.session_path = strdup(path);
 
     fm_free(app.frontmatter);
-    app.frontmatter = NULL;
+    app.frontmatter = fm_create();
+    fm_set_string(app.frontmatter, "title", "Untitled");
+    fm_set_string(app.frontmatter, "author", DAWN_BACKEND(app)->username());
+    char date_buf[32];
+    dawn_format_iso_time(&lt, date_buf, sizeof(date_buf));
+    fm_set_string(app.frontmatter, "date", date_buf);
+
     app.cursor = 0;
     app.selecting = false;
     app.timer_done = false;
@@ -4118,21 +4104,11 @@ static void handle_input(void)
             break;
         case 'd':
             if (app.hist_count > 0) {
-                HistoryEntry* entry = &app.history[app.hist_sel];
-                remove(entry->path);
-                char chat_path[520];
-                get_chat_path(entry->path, chat_path, sizeof(chat_path));
-                remove(chat_path);
-                free(entry->path);
-                free(entry->title);
-                free(entry->date_str);
-                for (int32_t i = app.hist_sel; i < app.hist_count - 1; i++)
-                    app.history[i] = app.history[i + 1];
-                app.hist_count--;
+                char* path = strdup(app.history[app.hist_sel].path);
+                hist_remove(path);
+                free(path);
                 if (app.hist_sel >= app.hist_count && app.hist_sel > 0)
                     app.hist_sel--;
-                if (app.hist_count == 0)
-                    app.mode = MODE_WELCOME;
             }
             break;
         }

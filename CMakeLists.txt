@@ -1,9 +1,14 @@
 cmake_minimum_required(VERSION 3.16)
 project(dawn C)
 
-set(CMAKE_C_STANDARD 23)
+if(MSVC)
+    set(CMAKE_C_STANDARD 17)
+else()
+    set(CMAKE_C_STANDARD 23)
+endif()
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 
 option(USE_LIBAI "Build with Apple Intelligence (macOS 26+)" OFF)
 option(ENABLE_ASAN "Enable AddressSanitizer" OFF)
@@ -21,6 +26,7 @@ endif()
 
 file(GLOB DAWN_SRCS src/dawn*.c)
 list(FILTER DAWN_SRCS EXCLUDE REGEX "dawn_backend_.*\\.c$")
+list(FILTER DAWN_SRCS EXCLUDE REGEX "dawn_compat\\.c$")
 file(GLOB HIGHLIGHT_SRCS src/highlight/*.c src/highlight/lang/*.c)
 
 set(PCRE2_BUILD_PCRE2GREP OFF CACHE BOOL "" FORCE)
@@ -39,14 +45,26 @@ add_subdirectory(third-party/utf8proc)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(ENABLE_LIBCLANG OFF CACHE BOOL "" FORCE)
 add_subdirectory(third-party/libfyaml)
+set_target_properties(fy-tool fy-thread fy-b3sum fy-allocators PROPERTIES EXCLUDE_FROM_ALL TRUE)
 
 if(NOT EMSCRIPTEN)
-    find_package(CURL REQUIRED)
+    # Select platform-specific backend
+    if(WIN32)
+        set(DAWN_BACKEND_SRC src/dawn_backend_win32.c)
+    else()
+        find_package(CURL REQUIRED)
+        set(DAWN_BACKEND_SRC src/dawn_backend_posix.c)
+    endif()
+
+    if(WIN32)
+        set(DAWN_COMPAT_SRC src/dawn_compat.c)
+    endif()
 
     add_executable(dawn
         ${DAWN_SRCS}
         ${HIGHLIGHT_SRCS}
-        src/dawn_backend_posix.c
+        ${DAWN_BACKEND_SRC}
+        ${DAWN_COMPAT_SRC}
         src/main_term.c
         third-party/cJSON.c
     )
@@ -60,25 +78,33 @@ if(NOT EMSCRIPTEN)
         third-party/libfyaml/include
     )
 
-    target_compile_options(dawn PRIVATE
-        -Wall -Wextra -Wpedantic -Werror -Wunused
-        $<$<C_COMPILER_ID:AppleClang,Clang>:-Wno-keyword-macro -Wno-newline-eof -Wno-deprecated-declarations>
-        ${SANITIZER_FLAGS}
-    )
-    set_source_files_properties(src/dawn_fm.c PROPERTIES COMPILE_FLAGS "-Wno-pedantic")
-    target_compile_definitions(dawn PRIVATE VERSION="${DAWN_VERSION}")
-
-    if(SANITIZER_FLAGS)
-        target_link_options(dawn PRIVATE ${SANITIZER_FLAGS})
+    if(MSVC)
+        target_compile_options(dawn PRIVATE /W4 /WX /wd4244 /wd4267 /wd4245 /wd4456 /wd4566 /wd4702 /utf-8)
+        target_compile_definitions(dawn PRIVATE _CRT_SECURE_NO_WARNINGS)
+    else()
+        target_compile_options(dawn PRIVATE
+            -Wall -Wextra -Wpedantic -Werror -Wunused
+            $<$<C_COMPILER_ID:AppleClang,Clang>:-Wno-keyword-macro -Wno-newline-eof -Wno-deprecated-declarations>
+            ${SANITIZER_FLAGS}
+        )
+        set_source_files_properties(src/dawn_fm.c PROPERTIES COMPILE_FLAGS "-Wno-pedantic")
+        if(SANITIZER_FLAGS)
+            target_link_options(dawn PRIVATE ${SANITIZER_FLAGS})
+        endif()
     endif()
+    target_compile_definitions(dawn PRIVATE VERSION="${DAWN_VERSION}")
 
     target_link_libraries(dawn PRIVATE
         pcre2-8-static
         utf8proc
         fyaml
-        CURL::libcurl
-        m
     )
+
+    if(WIN32)
+        target_link_libraries(dawn PRIVATE winhttp)
+    else()
+        target_link_libraries(dawn PRIVATE CURL::libcurl m)
+    endif()
 
     if(APPLE)
         target_link_libraries(dawn PRIVATE "-framework ApplicationServices")
@@ -123,21 +149,29 @@ if(NOT EMSCRIPTEN)
         third-party/pcre2/src
     )
 
-    target_compile_options(test-block PRIVATE
-        -Wall -Wextra -Wpedantic -Werror -Wunused
-        $<$<C_COMPILER_ID:AppleClang,Clang>:-Wno-keyword-macro -Wno-newline-eof -Wno-deprecated-declarations>
-        ${SANITIZER_FLAGS}
-    )
-
-    if(SANITIZER_FLAGS)
-        target_link_options(test-block PRIVATE ${SANITIZER_FLAGS})
+    if(MSVC)
+        target_compile_options(test-block PRIVATE /W4 /WX /utf-8)
+        target_compile_definitions(test-block PRIVATE _CRT_SECURE_NO_WARNINGS)
+    else()
+        target_compile_options(test-block PRIVATE
+            -Wall -Wextra -Wpedantic -Werror -Wunused
+            $<$<C_COMPILER_ID:AppleClang,Clang>:-Wno-keyword-macro -Wno-newline-eof -Wno-deprecated-declarations>
+            ${SANITIZER_FLAGS}
+        )
+        if(SANITIZER_FLAGS)
+            target_link_options(test-block PRIVATE ${SANITIZER_FLAGS})
+        endif()
     endif()
 
-    target_link_libraries(test-block PRIVATE pcre2-8-static utf8proc m)
+    target_link_libraries(test-block PRIVATE pcre2-8-static utf8proc)
+    if(NOT WIN32)
+        target_link_libraries(test-block PRIVATE m)
+    endif()
 else()
     file(GLOB WEB_SRCS src/dawn*.c)
     list(FILTER WEB_SRCS EXCLUDE REGEX "dawn_args.c")
     list(FILTER WEB_SRCS EXCLUDE REGEX "dawn_backend_posix.c")
+    list(FILTER WEB_SRCS EXCLUDE REGEX "dawn_backend_win32.c")
 
     add_executable(dawn-web
         ${WEB_SRCS}

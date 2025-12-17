@@ -2,12 +2,12 @@
 //! @brief Core implementation of the highlight library
 
 #include "highlight.h"
+#include "dawn_compat.h"
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>

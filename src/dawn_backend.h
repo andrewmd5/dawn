@@ -40,10 +40,10 @@ DAWN_ENUM(uint8_t) {
     DAWN_UNDERLINE_DASHED
 } DawnUnderline;
 
-DAWN_ENUM(int16_t) {
+DAWN_ENUM(int32_t) {
     DAWN_KEY_NONE = -1,
     DAWN_KEY_ESC = 0x1b,
-    DAWN_KEY_UP = 1000,
+    DAWN_KEY_UP = 0x110000, // Above Unicode max (0x10FFFF) to not conflict with codepoints
     DAWN_KEY_DOWN,
     DAWN_KEY_RIGHT,
     DAWN_KEY_LEFT,
@@ -173,6 +173,9 @@ typedef struct DawnBackend {
     int64_t (*mtime)(const char* path);
     bool (*rm)(const char* path);
     void (*reveal)(const char* path);
+
+    // Shutdown events
+    void (*on_shutdown)(void (*callback)(void));
 
     // Time
     int64_t (*clock)(DawnClock kind);

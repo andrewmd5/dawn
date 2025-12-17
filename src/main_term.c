@@ -6,7 +6,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef _WIN32
+extern const DawnBackend dawn_backend_win32;
+#define DAWN_BACKEND_PLATFORM dawn_backend_win32
+#else
 extern const DawnBackend dawn_backend_posix;
+#define DAWN_BACKEND_PLATFORM dawn_backend_posix
+#endif
 
 int32_t main(int32_t argc, char* argv[])
 {
@@ -52,7 +58,7 @@ int32_t main(int32_t argc, char* argv[])
         : DAWN_MODE_INTERACTIVE;
 
     // Initialize context with backend
-    if (!dawn_ctx_init(&app.ctx, &dawn_backend_posix, mode)) {
+    if (!dawn_ctx_init(&app.ctx, &DAWN_BACKEND_PLATFORM, mode)) {
         fprintf(stderr, "dawn: failed to initialize backend\n");
         free(stdin_content);
         args_free(&args);
