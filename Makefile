@@ -1,4 +1,5 @@
 BUILD = build
+PREFIX ?= /usr/local
 
 all:
 	@cmake -B $(BUILD) -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -25,9 +26,9 @@ clean:
 	@rm -rf $(BUILD) $(BUILD)-web
 
 install: release
-	@cmake --install $(BUILD) --prefix /usr/local
+	@cmake --install $(BUILD) --prefix $(PREFIX)
 
 uninstall:
-	@rm -f /usr/local/bin/dawn
+	@rm -f $(PREFIX)/bin/dawn
 
 .PHONY: all release debug with-ai web clean install uninstall
