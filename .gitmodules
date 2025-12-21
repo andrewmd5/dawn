@@ -4,9 +4,9 @@
 [submodule "third-party/pcre2"]
 	path = third-party/pcre2
 	url = https://github.com/PCRE2Project/pcre2.git
-[submodule "third-party/libfyaml"]
-	path = third-party/libfyaml
-	url = https://github.com/andrewmd5/libfyaml.git
 [submodule "third-party/nanosvg"]
 	path = third-party/nanosvg
 	url = https://github.com/memononen/nanosvg
+[submodule "third-party/cyaml"]
+	path = third-party/cyaml
+	url = https://github.com/andrewmd5/cyaml

@@ -41,11 +41,10 @@ add_subdirectory(third-party/pcre2)
 
 add_subdirectory(third-party/utf8proc)
 
-# libfyaml for YAML frontmatter parsing
-set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-set(ENABLE_LIBCLANG OFF CACHE BOOL "" FORCE)
-add_subdirectory(third-party/libfyaml)
-set_target_properties(fy-tool fy-thread fy-b3sum fy-allocators PROPERTIES EXCLUDE_FROM_ALL TRUE)
+# cyaml for YAML frontmatter parsing
+set(CYAML_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(CYAML_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+add_subdirectory(third-party/cyaml)
 
 if(NOT EMSCRIPTEN)
     # Select platform-specific backend
@@ -75,7 +74,7 @@ if(NOT EMSCRIPTEN)
         third-party/nanosvg/src
         ${CMAKE_BINARY_DIR}/third-party/pcre2
         third-party/pcre2/src
-        third-party/libfyaml/include
+        third-party/cyaml/src
     )
 
     if(MSVC)
@@ -87,7 +86,6 @@ if(NOT EMSCRIPTEN)
             $<$<C_COMPILER_ID:AppleClang,Clang>:-Wno-keyword-macro -Wno-newline-eof -Wno-deprecated-declarations>
             ${SANITIZER_FLAGS}
         )
-        set_source_files_properties(src/dawn_fm.c PROPERTIES COMPILE_FLAGS "-Wno-pedantic")
         if(SANITIZER_FLAGS)
             target_link_options(dawn PRIVATE ${SANITIZER_FLAGS})
         endif()
@@ -97,7 +95,7 @@ if(NOT EMSCRIPTEN)
     target_link_libraries(dawn PRIVATE
         pcre2-8-static
         utf8proc
-        fyaml
+        cyaml_static
     )
 
     if(WIN32)
@@ -186,12 +184,12 @@ else()
         third-party
         ${CMAKE_BINARY_DIR}/third-party/pcre2
         third-party/pcre2/src
-        third-party/libfyaml/include
+        third-party/cyaml/src
         third-party/nanosvg/src
     )
 
     target_compile_options(dawn-web PRIVATE -O2)
-    target_link_libraries(dawn-web PRIVATE pcre2-8-static utf8proc fyaml)
+    target_link_libraries(dawn-web PRIVATE pcre2-8-static utf8proc cyaml_static)
 
     set_target_properties(dawn-web PROPERTIES
         OUTPUT_NAME "dawn"

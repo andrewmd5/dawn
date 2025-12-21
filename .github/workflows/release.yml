@@ -16,9 +16,13 @@ jobs:
           - os: macos-latest
             target: macos-arm64
             artifact: dawn-macos-arm64
-          - os: macos-15-intel
+            cmake_arch: arm64
+            run_arch: ""
+          - os: macos-latest
             target: macos-x64
             artifact: dawn-macos-x64
+            cmake_arch: x86_64
+            run_arch: "arch -x86_64"
           - os: ubuntu-latest
             target: linux-x64
             artifact: dawn-linux-x64
@@ -48,8 +52,21 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev
 
-      - name: Build (Unix)
-        if: "!startsWith(matrix.os, 'windows')"
+      - name: Build (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=${{ matrix.cmake_arch }} -DDAWN_VERSION="$VERSION"
+          cmake --build build -j
+          strip build/dawn
+
+      - name: Verify binary (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: ${{ matrix.run_arch }} ./build/dawn -h
+
+      - name: Build (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
         run: |
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
@@ -57,12 +74,20 @@ jobs:
           cmake --build build -j
           strip build/dawn
 
+      - name: Verify binary (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: ./build/dawn -h
+
       - name: Build (Windows)
         if: startsWith(matrix.os, 'windows')
         run: |
           $VERSION = "${{ github.ref_name }}" -replace '^v', ''
           cmake -S . -B build -A ${{ matrix.arch }} -DDAWN_VERSION="$VERSION"
           cmake --build build --config Release
+
+      - name: Verify binary (Windows)
+        if: startsWith(matrix.os, 'windows')
+        run: ./build/Release/dawn.exe -h
 
       - name: Package (Unix)
         if: "!startsWith(matrix.os, 'windows')"
