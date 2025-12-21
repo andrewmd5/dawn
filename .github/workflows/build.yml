@@ -8,21 +8,29 @@ on:
 
 jobs:
   build-macos:
-    runs-on: macos-14
+    strategy:
+      matrix:
+        include:
+          - arch: arm64
+            cmake_arch: arm64
+            run_arch: ""
+          - arch: x64
+            cmake_arch: x86_64
+            run_arch: "arch -x86_64"
+
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Install dependencies
+      - name: Build (${{ matrix.arch }})
         run: |
-          brew install automake autoconf libtool
-
-      - name: Build
-        run: make
+          cmake -B build -DCMAKE_OSX_ARCHITECTURES=${{ matrix.cmake_arch }}
+          cmake --build build -j
 
       - name: Verify binary
-        run: ./build/dawn -h
+        run: ${{ matrix.run_arch }} ./build/dawn -h
 
   build-linux:
     runs-on: ubuntu-latest
@@ -34,10 +42,12 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y automake autoconf libtool libcurl4-openssl-dev
+          sudo apt-get install -y libcurl4-openssl-dev
 
       - name: Build
-        run: make
+        run: |
+          cmake -B build
+          cmake --build build -j
 
       - name: Verify binary
         run: ./build/dawn -h
