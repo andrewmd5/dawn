@@ -33,7 +33,15 @@ jobs:
         run: ${{ matrix.run_arch }} ./build/dawn -h
 
   build-linux:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,7 +52,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev
 
-      - name: Build
+      - name: Build (${{ matrix.arch }})
         run: |
           cmake -B build
           cmake --build build -j
