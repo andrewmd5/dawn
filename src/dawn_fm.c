@@ -281,58 +281,22 @@ bool fm_has_key(const Frontmatter* fm, const char* key)
     return cyaml_has(fm->doc, root, key);
 }
 
-//! Infer scalar type from content (YAML 1.1 rules)
-static FmType infer_scalar_type(const char* str)
+//! Convert cyaml scalar kind to FmType
+static FmType scalar_kind_to_fm_type(cyaml_scalar_kind_t kind)
 {
-    if (!str || *str == '\0')
+    switch (kind) {
+    case CYAML_KIND_NULL:
         return FM_NULL;
-
-    // Null patterns
-    if (strcmp(str, "~") == 0 || strcmp(str, "null") == 0 || strcmp(str, "Null") == 0 || strcmp(str, "NULL") == 0) {
-        return FM_NULL;
-    }
-
-    // Boolean patterns
-    if (strcmp(str, "true") == 0 || strcmp(str, "True") == 0 || strcmp(str, "TRUE") == 0 || strcmp(str, "yes") == 0 || strcmp(str, "Yes") == 0 || strcmp(str, "YES") == 0 || strcmp(str, "on") == 0 || strcmp(str, "On") == 0 || strcmp(str, "ON") == 0) {
+    case CYAML_KIND_BOOL:
         return FM_BOOL;
-    }
-    if (strcmp(str, "false") == 0 || strcmp(str, "False") == 0 || strcmp(str, "FALSE") == 0 || strcmp(str, "no") == 0 || strcmp(str, "No") == 0 || strcmp(str, "NO") == 0 || strcmp(str, "off") == 0 || strcmp(str, "Off") == 0 || strcmp(str, "OFF") == 0) {
-        return FM_BOOL;
-    }
-
-    // Check for integer (optional sign, digits only)
-    const char* p = str;
-    if (*p == '+' || *p == '-')
-        p++;
-    if (*p == '\0')
+    case CYAML_KIND_INT:
+        return FM_INT;
+    case CYAML_KIND_FLOAT:
+        return FM_FLOAT;
+    case CYAML_KIND_STRING:
+    default:
         return FM_STRING;
-
-    bool has_dot = false;
-    bool has_exp = false;
-    bool all_digits = true;
-
-    for (; *p; p++) {
-        if (*p >= '0' && *p <= '9')
-            continue;
-        if (*p == '.' && !has_dot && !has_exp) {
-            has_dot = true;
-            continue;
-        }
-        if ((*p == 'e' || *p == 'E') && !has_exp) {
-            has_exp = true;
-            if (p[1] == '+' || p[1] == '-')
-                p++;
-            continue;
-        }
-        all_digits = false;
-        break;
     }
-
-    if (all_digits) {
-        return (has_dot || has_exp) ? FM_FLOAT : FM_INT;
-    }
-
-    return FM_STRING;
 }
 
 FmType fm_get_type(const Frontmatter* fm, const char* key)
@@ -355,9 +319,7 @@ FmType fm_get_type(const Frontmatter* fm, const char* key)
     if (cyaml_is_null(node))
         return FM_NULL;
 
-    // It's a scalar - infer type from content
-    const char* str = get_cached_scalar((Frontmatter*)fm, node);
-    return infer_scalar_type(str);
+    return scalar_kind_to_fm_type(cyaml_scalar_kind(fm->doc, node));
 }
 
 const char* fm_type_name(FmType type)
@@ -590,8 +552,7 @@ static FmType get_node_type(Frontmatter* fm, cyaml_node_t* node)
         return FM_MAPPING;
     if (cyaml_is_seq(node))
         return FM_SEQUENCE;
-    const char* str = get_cached_scalar(fm, node);
-    return infer_scalar_type(str);
+    return scalar_kind_to_fm_type(cyaml_scalar_kind(fm->doc, node));
 }
 
 void fm_iterate(const Frontmatter* fm, FmIterCb cb, void* user_data)
