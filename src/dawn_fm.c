@@ -176,8 +176,8 @@ Frontmatter* fm_parse(const char* content, size_t len, size_t* consumed)
     // Calculate consumed bytes
     if (consumed) {
         *consumed = (size_t)((end + 4) - content);
-        // Skip trailing newline after ---
-        if (*consumed < len && content[*consumed] == '\n')
+        // Skip trailing newlines after ---
+        while (*consumed < len && content[*consumed] == '\n')
             (*consumed)++;
     }
 

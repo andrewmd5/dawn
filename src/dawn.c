@@ -4088,8 +4088,16 @@ static void handle_input(void)
         case 'o':
         case '\r':
         case '\n':
-            if (app.hist_count > 0)
+            if (app.hist_count > 0) {
+                size_t saved_cursor = app.history[app.hist_sel].cursor;
                 load_file_for_editing(app.history[app.hist_sel].path);
+                // Restore cursor position, clamped to document length
+                size_t doc_len = gap_len(&app.text);
+                app.cursor = saved_cursor <= doc_len ? saved_cursor : doc_len;
+                // Snap to valid UTF-8 boundary if cursor landed mid-character
+                while (app.cursor > 0 && (gap_at(&app.text, app.cursor) & 0xC0) == 0x80)
+                    app.cursor--;
+            }
             break;
         case 'e':
             if (app.hist_count > 0)
@@ -4097,7 +4105,13 @@ static void handle_input(void)
             break;
         case 't':
             if (app.hist_count > 0) {
+                size_t saved_cursor = app.history[app.hist_sel].cursor;
                 load_file_for_editing(app.history[app.hist_sel].path);
+                size_t doc_len = gap_len(&app.text);
+                app.cursor = saved_cursor <= doc_len ? saved_cursor : doc_len;
+                // Snap to valid UTF-8 boundary if cursor landed mid-character
+                while (app.cursor > 0 && (gap_at(&app.text, app.cursor) & 0xC0) == 0x80)
+                    app.cursor--;
                 fm_edit_init();
                 MODE_PUSH(MODE_FM_EDIT);
             }

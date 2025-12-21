@@ -68,6 +68,50 @@ static void format_date(int64_t timestamp, char* buf, size_t len)
     dawn_format_human_time(&lt, buf, len);
 }
 
+//! Parse CRDT value which may be plain title string or JSON {"title":...,"cursor":...}
+static void parse_entry_value(const char* value, char** title_out, size_t* cursor_out)
+{
+    *title_out = NULL;
+    *cursor_out = 0;
+
+    if (!value)
+        return;
+
+    // Try parsing as JSON first
+    cJSON* obj = cJSON_Parse(value);
+    if (obj && cJSON_IsObject(obj)) {
+        cJSON* title_j = cJSON_GetObjectItem(obj, "title");
+        cJSON* cursor_j = cJSON_GetObjectItem(obj, "cursor");
+
+        if (title_j && cJSON_IsString(title_j))
+            *title_out = strdup(title_j->valuestring);
+        if (cursor_j && cJSON_IsNumber(cursor_j))
+            *cursor_out = (size_t)cursor_j->valuedouble;
+
+        cJSON_Delete(obj);
+        return;
+    }
+    cJSON_Delete(obj);
+
+    // Fall back to treating value as plain title string (legacy format)
+    *title_out = strdup(value);
+}
+
+//! Encode title and cursor as JSON value for CRDT storage
+static char* encode_entry_value(const char* title, size_t cursor)
+{
+    cJSON* obj = cJSON_CreateObject();
+    if (title)
+        cJSON_AddStringToObject(obj, "title", title);
+    else
+        cJSON_AddNullToObject(obj, "title");
+    cJSON_AddNumberToObject(obj, "cursor", (double)cursor);
+
+    char* json = cJSON_PrintUnformatted(obj);
+    cJSON_Delete(obj);
+    return json;
+}
+
 static void rebuild_history_array(void)
 {
     hist_free();
@@ -93,7 +137,9 @@ static void rebuild_history_array(void)
 
         HistoryEntry* entry = &app.history[app.hist_count];
         entry->path = strdup(e->key);
-        entry->title = e->value ? strdup(e->value) : NULL;
+
+        // Parse value which may be JSON or plain title
+        parse_entry_value(e->value, &entry->title, &entry->cursor);
 
         char date_buf[64];
         format_date(e->timestamp, date_buf, sizeof(date_buf));
@@ -273,7 +319,7 @@ void hist_shutdown(void)
 
 // #region Operations
 
-bool hist_upsert(const char* path, const char* title)
+bool hist_upsert(const char* path, const char* title, size_t cursor)
 {
     if (!path)
         return false;
@@ -284,7 +330,9 @@ bool hist_upsert(const char* path, const char* title)
         hist_state = crdt_create();
 
     char* norm_path = normalize_path(path);
-    crdt_upsert(hist_state, norm_path, title);
+    char* value = encode_entry_value(title, cursor);
+    crdt_upsert(hist_state, norm_path, value);
+    free(value);
     free(norm_path);
 
     hist_save();
