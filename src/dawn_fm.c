@@ -1,17 +1,79 @@
 // dawn_fm.c - YAML frontmatter parsing and serialization
 
 #include "dawn_fm.h"
-#include <libfyaml.h>
+#include <cyaml.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 // #region Types
 
+// String cache entry for scalar values
+typedef struct StringCacheEntry {
+    cyaml_node_t* node;
+    char* str;
+    struct StringCacheEntry* next;
+} StringCacheEntry;
+
 struct Frontmatter {
-    struct fy_document* doc;
-    char* backing_buf; // Original YAML string (libfyaml keeps references)
+    cyaml_doc_t* doc;
+    char* backing_buf; // Original YAML string (cyaml keeps references for parsed docs)
+    StringCacheEntry* string_cache; // Cache of scalar strings
 };
+
+// #endregion
+
+// #region String Cache Helpers
+
+static void cache_free(StringCacheEntry* cache)
+{
+    while (cache) {
+        StringCacheEntry* next = cache->next;
+        free(cache->str);
+        free(cache);
+        cache = next;
+    }
+}
+
+static const char* cache_get(Frontmatter* fm, cyaml_node_t* node)
+{
+    for (StringCacheEntry* e = fm->string_cache; e; e = e->next) {
+        if (e->node == node)
+            return e->str;
+    }
+    return NULL;
+}
+
+static const char* cache_put(Frontmatter* fm, cyaml_node_t* node, char* str)
+{
+    StringCacheEntry* e = malloc(sizeof(StringCacheEntry));
+    if (!e) {
+        free(str);
+        return NULL;
+    }
+    e->node = node;
+    e->str = str;
+    e->next = fm->string_cache;
+    fm->string_cache = e;
+    return str;
+}
+
+// Get or create cached string for a scalar node
+static const char* get_cached_scalar(Frontmatter* fm, cyaml_node_t* node)
+{
+    if (!node || !cyaml_is_scalar(node))
+        return NULL;
+
+    const char* cached = cache_get(fm, node);
+    if (cached)
+        return cached;
+
+    char* str = cyaml_scalar_str(fm->doc, node);
+    if (!str)
+        return NULL;
+
+    return cache_put(fm, node, str);
+}
 
 // #endregion
 
@@ -50,50 +112,70 @@ Frontmatter* fm_parse(const char* content, size_t len, size_t* consumed)
         return NULL;
 
     // Extract YAML content between delimiters
-    size_t yaml_len = end - start;
+    size_t yaml_len = (size_t)(end - start);
     if (yaml_len == 0) {
         // Empty frontmatter
         if (consumed) {
-            *consumed = (end + 4) - content;
+            *consumed = (size_t)((end + 4) - content);
             if (*consumed < len && content[*consumed] == '\n')
                 (*consumed)++;
         }
         return fm_create();
     }
 
-    // Parse YAML - copy the string since libfyaml keeps references to it
+    // Copy the string since cyaml borrows the source for parsed documents
     char* yaml_copy = malloc(yaml_len + 1);
     if (!yaml_copy)
         return NULL;
     memcpy(yaml_copy, start, yaml_len);
     yaml_copy[yaml_len] = '\0';
 
-    struct fy_document* doc = fy_document_build_from_string(NULL, yaml_copy, yaml_len);
-    if (!doc) {
+    cyaml_error_t err;
+    cyaml_doc_t* parsed = cyaml_parse(yaml_copy, yaml_len, NULL, &err);
+    if (!parsed) {
         free(yaml_copy);
         return NULL;
     }
 
     // Verify root is a mapping
-    struct fy_node* root = fy_document_root(doc);
-    if (!root || !fy_node_is_mapping(root)) {
-        fy_document_destroy(doc);
+    cyaml_node_t* parsed_root = cyaml_root(parsed);
+    if (!parsed_root || !cyaml_is_map(parsed_root)) {
+        cyaml_free(parsed);
         free(yaml_copy);
         return NULL;
     }
+
+    // Convert to a built document so we can modify it
+    // (parsed docs are read-only - cyaml_new_* only works on built docs)
+    cyaml_doc_t* doc = cyaml_doc_new();
+    if (!doc) {
+        cyaml_free(parsed);
+        free(yaml_copy);
+        return NULL;
+    }
+
+    cyaml_node_t* root = cyaml_node_copy(doc, parsed, parsed_root);
+    cyaml_free(parsed);
+    free(yaml_copy);
+
+    if (!root) {
+        cyaml_free(doc);
+        return NULL;
+    }
+    cyaml_set_root(doc, root);
 
     Frontmatter* fm = malloc(sizeof(Frontmatter));
     if (!fm) {
-        fy_document_destroy(doc);
-        free(yaml_copy);
+        cyaml_free(doc);
         return NULL;
     }
     fm->doc = doc;
-    fm->backing_buf = yaml_copy;
+    fm->backing_buf = NULL; // Built docs own their string data
+    fm->string_cache = NULL;
 
     // Calculate consumed bytes
     if (consumed) {
-        *consumed = (end + 4) - content;
+        *consumed = (size_t)((end + 4) - content);
         // Skip trailing newline after ---
         if (*consumed < len && content[*consumed] == '\n')
             (*consumed)++;
@@ -104,25 +186,26 @@ Frontmatter* fm_parse(const char* content, size_t len, size_t* consumed)
 
 Frontmatter* fm_create(void)
 {
-    struct fy_document* doc = fy_document_create(NULL);
+    cyaml_doc_t* doc = cyaml_doc_new();
     if (!doc)
         return NULL;
 
-    // Create empty block mapping as root (not flow style {})
-    struct fy_node* root = fy_node_create_mapping(doc);
+    // Create empty mapping as root
+    cyaml_node_t* root = cyaml_new_map(doc);
     if (!root) {
-        fy_document_destroy(doc);
+        cyaml_free(doc);
         return NULL;
     }
-    fy_document_set_root(doc, root);
+    cyaml_set_root(doc, root);
 
     Frontmatter* fm = malloc(sizeof(Frontmatter));
     if (!fm) {
-        fy_document_destroy(doc);
+        cyaml_free(doc);
         return NULL;
     }
     fm->doc = doc;
     fm->backing_buf = NULL;
+    fm->string_cache = NULL;
     return fm;
 }
 
@@ -130,8 +213,9 @@ void fm_free(Frontmatter* fm)
 {
     if (!fm)
         return;
+    cache_free(fm->string_cache);
     if (fm->doc)
-        fy_document_destroy(fm->doc);
+        cyaml_free(fm->doc);
     free(fm->backing_buf);
     free(fm);
 }
@@ -145,15 +229,15 @@ const char* fm_get_string(const Frontmatter* fm, const char* key)
     if (!fm || !fm->doc || !key)
         return NULL;
 
-    struct fy_node* root = fy_document_root(fm->doc);
+    cyaml_node_t* root = cyaml_root(fm->doc);
     if (!root)
         return NULL;
 
-    struct fy_node* node = fy_node_by_path(root, key, -1, FYNWF_DONT_FOLLOW);
-    if (!node || !fy_node_is_scalar(node))
+    cyaml_node_t* node = cyaml_get(fm->doc, root, key);
+    if (!node || !cyaml_is_scalar(node))
         return NULL;
 
-    return fy_node_get_scalar0(node);
+    return get_cached_scalar((Frontmatter*)fm, node);
 }
 
 int fm_get_int(const Frontmatter* fm, const char* key, int default_val)
@@ -190,12 +274,11 @@ bool fm_has_key(const Frontmatter* fm, const char* key)
     if (!fm || !fm->doc || !key)
         return false;
 
-    struct fy_node* root = fy_document_root(fm->doc);
+    cyaml_node_t* root = cyaml_root(fm->doc);
     if (!root)
         return false;
 
-    struct fy_node* node = fy_node_by_path(root, key, -1, FYNWF_DONT_FOLLOW);
-    return node != NULL;
+    return cyaml_has(fm->doc, root, key);
 }
 
 //! Infer scalar type from content (YAML 1.1 rules)
@@ -257,23 +340,23 @@ FmType fm_get_type(const Frontmatter* fm, const char* key)
     if (!fm || !fm->doc || !key)
         return FM_NULL;
 
-    struct fy_node* root = fy_document_root(fm->doc);
+    cyaml_node_t* root = cyaml_root(fm->doc);
     if (!root)
         return FM_NULL;
 
-    struct fy_node* node = fy_node_by_path(root, key, -1, FYNWF_DONT_FOLLOW);
+    cyaml_node_t* node = cyaml_get(fm->doc, root, key);
     if (!node)
         return FM_NULL;
 
-    if (fy_node_is_mapping(node))
+    if (cyaml_is_map(node))
         return FM_MAPPING;
-    if (fy_node_is_sequence(node))
+    if (cyaml_is_seq(node))
         return FM_SEQUENCE;
-    if (fy_node_is_null(node))
+    if (cyaml_is_null(node))
         return FM_NULL;
 
     // It's a scalar - infer type from content
-    const char* str = fy_node_get_scalar0(node);
+    const char* str = get_cached_scalar((Frontmatter*)fm, node);
     return infer_scalar_type(str);
 }
 
@@ -307,48 +390,21 @@ bool fm_set_string(Frontmatter* fm, const char* key, const char* value)
     if (!fm || !fm->doc || !key)
         return false;
 
-    struct fy_node* root = fy_document_root(fm->doc);
-    if (!root || !fy_node_is_mapping(root))
+    cyaml_node_t* root = cyaml_root(fm->doc);
+    if (!root || !cyaml_is_map(root))
         return false;
 
-    // First, remove existing key if present (collect pair to remove, then remove after iteration)
-    struct fy_node_pair* to_remove = NULL;
-    void* iter = NULL;
-    struct fy_node_pair* pair;
-    while ((pair = fy_node_mapping_iterate(root, &iter))) {
-        struct fy_node* k = fy_node_pair_key(pair);
-        if (k) {
-            const char* kstr = fy_node_get_scalar0(k);
-            if (kstr && strcmp(kstr, key) == 0) {
-                to_remove = pair;
-                break;
-            }
-        }
-    }
-    if (to_remove) {
-        fy_node_mapping_remove(root, to_remove);
-    }
-
-    // Build key node
-    struct fy_node* key_node = fy_node_create_scalar_copy(fm->doc, key, strlen(key));
-    if (!key_node)
-        return false;
-
-    struct fy_node* val_node;
+    cyaml_node_t* val_node;
     if (value) {
-        val_node = fy_node_create_scalar_copy(fm->doc, value, strlen(value));
+        val_node = cyaml_new_cstr(fm->doc, value);
     } else {
-        val_node = fy_node_build_from_string(fm->doc, "~", 1); // null
+        val_node = cyaml_new_null(fm->doc);
     }
 
-    if (!val_node) {
-        fy_node_free(key_node);
+    if (!val_node)
         return false;
-    }
 
-    // Append new key-value
-    int ret = fy_node_mapping_append(root, key_node, val_node);
-    return ret == 0;
+    return cyaml_map_set(fm->doc, root, key, val_node);
 }
 
 bool fm_set_int(Frontmatter* fm, const char* key, int value)
@@ -368,23 +424,10 @@ bool fm_remove(Frontmatter* fm, const char* key)
     if (!fm || !fm->doc || !key)
         return false;
 
-    struct fy_node* root = fy_document_root(fm->doc);
-    if (!root || !fy_node_is_mapping(root))
-        return false;
-
-    void* iter = NULL;
-    struct fy_node_pair* pair;
-    while ((pair = fy_node_mapping_iterate(root, &iter))) {
-        struct fy_node* k = fy_node_pair_key(pair);
-        if (k) {
-            const char* kstr = fy_node_get_scalar0(k);
-            if (kstr && strcmp(kstr, key) == 0) {
-                fy_node_mapping_remove(root, pair);
-                return true;
-            }
-        }
-    }
-    return false;
+    // Use path-based deletion
+    char path[256];
+    snprintf(path, sizeof(path), "/%s", key);
+    return cyaml_delete_at(fm->doc, path);
 }
 
 bool fm_set_sequence(Frontmatter* fm, const char* key, const char** items, int count, bool flow_style)
@@ -392,70 +435,37 @@ bool fm_set_sequence(Frontmatter* fm, const char* key, const char** items, int c
     if (!fm || !fm->doc || !key)
         return false;
 
-    struct fy_node* root = fy_document_root(fm->doc);
-    if (!root || !fy_node_is_mapping(root))
+    cyaml_node_t* root = cyaml_root(fm->doc);
+    if (!root || !cyaml_is_map(root))
         return false;
 
-    // Remove existing key if present
-    struct fy_node_pair* to_remove = NULL;
-    void* iter = NULL;
-    struct fy_node_pair* pair;
-    while ((pair = fy_node_mapping_iterate(root, &iter))) {
-        struct fy_node* k = fy_node_pair_key(pair);
-        if (k) {
-            const char* kstr = fy_node_get_scalar0(k);
-            if (kstr && strcmp(kstr, key) == 0) {
-                to_remove = pair;
-                break;
-            }
-        }
-    }
-    if (to_remove) {
-        fy_node_mapping_remove(root, to_remove);
-    }
-
-    // Build key node
-    struct fy_node* key_node = fy_node_create_scalar_copy(fm->doc, key, strlen(key));
-    if (!key_node)
+    // Create sequence
+    cyaml_node_t* seq_node = cyaml_new_seq(fm->doc);
+    if (!seq_node)
         return false;
 
-    // Create sequence with desired style by parsing appropriate syntax
-    // Flow: "[]", Block: created directly (defaults to block on emit)
-    struct fy_node* seq_node;
+    // Set flow style if requested
     if (flow_style) {
-        seq_node = fy_node_build_from_string(fm->doc, "[]", 2);
-    } else {
-        seq_node = fy_node_create_sequence(fm->doc);
-    }
-    if (!seq_node) {
-        fy_node_free(key_node);
-        return false;
+        seq_node->style = (cyaml_style_t)CYAML_FLOW;
     }
 
     // Add items to the sequence
     for (int i = 0; i < count; i++) {
-        struct fy_node* item_node;
+        cyaml_node_t* item_node;
         if (items[i]) {
-            item_node = fy_node_create_scalar_copy(fm->doc, items[i], strlen(items[i]));
+            item_node = cyaml_new_cstr(fm->doc, items[i]);
         } else {
-            item_node = fy_node_build_from_string(fm->doc, "~", 1);
+            item_node = cyaml_new_null(fm->doc);
         }
         if (!item_node) {
-            fy_node_free(key_node);
-            fy_node_free(seq_node);
             return false;
         }
-        if (fy_node_sequence_append(seq_node, item_node) != 0) {
-            fy_node_free(item_node);
-            fy_node_free(key_node);
-            fy_node_free(seq_node);
+        if (!cyaml_seq_push(seq_node, item_node)) {
             return false;
         }
     }
 
-    // Append key-sequence pair
-    int ret = fy_node_mapping_append(root, key_node, seq_node);
-    return ret == 0;
+    return cyaml_map_set(fm->doc, root, key, seq_node);
 }
 
 int fm_get_sequence_count(const Frontmatter* fm, const char* key)
@@ -463,15 +473,15 @@ int fm_get_sequence_count(const Frontmatter* fm, const char* key)
     if (!fm || !fm->doc || !key)
         return 0;
 
-    struct fy_node* root = fy_document_root(fm->doc);
+    cyaml_node_t* root = cyaml_root(fm->doc);
     if (!root)
         return 0;
 
-    struct fy_node* node = fy_node_by_path(root, key, -1, FYNWF_DONT_FOLLOW);
-    if (!node || !fy_node_is_sequence(node))
+    cyaml_node_t* node = cyaml_get(fm->doc, root, key);
+    if (!node || !cyaml_is_seq(node))
         return 0;
 
-    return fy_node_sequence_item_count(node);
+    return (int)cyaml_seq_len(node);
 }
 
 const char* fm_get_sequence_item(const Frontmatter* fm, const char* key, int index)
@@ -479,19 +489,19 @@ const char* fm_get_sequence_item(const Frontmatter* fm, const char* key, int ind
     if (!fm || !fm->doc || !key || index < 0)
         return NULL;
 
-    struct fy_node* root = fy_document_root(fm->doc);
+    cyaml_node_t* root = cyaml_root(fm->doc);
     if (!root)
         return NULL;
 
-    struct fy_node* node = fy_node_by_path(root, key, -1, FYNWF_DONT_FOLLOW);
-    if (!node || !fy_node_is_sequence(node))
+    cyaml_node_t* node = cyaml_get(fm->doc, root, key);
+    if (!node || !cyaml_is_seq(node))
         return NULL;
 
-    struct fy_node* item = fy_node_sequence_get_by_index(node, index);
-    if (!item || !fy_node_is_scalar(item))
+    cyaml_node_t* item = cyaml_seq_get(node, (uint32_t)index);
+    if (!item || !cyaml_is_scalar(item))
         return NULL;
 
-    return fy_node_get_scalar0(item);
+    return get_cached_scalar((Frontmatter*)fm, item);
 }
 
 bool fm_is_sequence_flow(const Frontmatter* fm, const char* key)
@@ -499,15 +509,15 @@ bool fm_is_sequence_flow(const Frontmatter* fm, const char* key)
     if (!fm || !fm->doc || !key)
         return false;
 
-    struct fy_node* root = fy_document_root(fm->doc);
+    cyaml_node_t* root = cyaml_root(fm->doc);
     if (!root)
         return false;
 
-    struct fy_node* node = fy_node_by_path(root, key, -1, FYNWF_DONT_FOLLOW);
-    if (!node || !fy_node_is_sequence(node))
+    cyaml_node_t* node = cyaml_get(fm->doc, root, key);
+    if (!node || !cyaml_is_seq(node))
         return false;
 
-    return fy_node_get_style(node) == FYNS_FLOW;
+    return node->style == (cyaml_style_t)CYAML_FLOW;
 }
 
 // #endregion
@@ -529,15 +539,22 @@ char* fm_to_string(const Frontmatter* fm, size_t* len)
         return NULL;
     }
 
-    // Emit YAML content - use ORIGINAL mode to preserve existing styles
-    char* yaml = fy_emit_document_to_string(fm->doc, FYECF_DEFAULT | FYECF_NO_ENDING_NEWLINE);
+    // Emit YAML content, preserving original styles (flow vs block)
+    cyaml_emit_opts_t opts = CYAML_EMIT_DEFAULT;
+    opts.preserve_style = true;
+    size_t yaml_len;
+    char* yaml = cyaml_emit(fm->doc, &opts, &yaml_len);
     if (!yaml) {
         if (len)
             *len = 0;
         return NULL;
     }
 
-    size_t yaml_len = strlen(yaml);
+    // Remove trailing newline if present (we'll add our own formatting)
+    while (yaml_len > 0 && yaml[yaml_len - 1] == '\n') {
+        yaml_len--;
+        yaml[yaml_len] = '\0';
+    }
 
     // Build full frontmatter with delimiters: "---\n" + yaml + "\n---\n"
     size_t total = 4 + yaml_len + 5;
@@ -565,15 +582,15 @@ char* fm_to_string(const Frontmatter* fm, size_t* len)
 // #region Iteration
 
 //! Get type for a node
-static FmType get_node_type(struct fy_node* node)
+static FmType get_node_type(Frontmatter* fm, cyaml_node_t* node)
 {
-    if (!node || fy_node_is_null(node))
+    if (!node || cyaml_is_null(node))
         return FM_NULL;
-    if (fy_node_is_mapping(node))
+    if (cyaml_is_map(node))
         return FM_MAPPING;
-    if (fy_node_is_sequence(node))
+    if (cyaml_is_seq(node))
         return FM_SEQUENCE;
-    const char* str = fy_node_get_scalar0(node);
+    const char* str = get_cached_scalar(fm, node);
     return infer_scalar_type(str);
 }
 
@@ -582,22 +599,22 @@ void fm_iterate(const Frontmatter* fm, FmIterCb cb, void* user_data)
     if (!fm || !fm->doc || !cb)
         return;
 
-    struct fy_node* root = fy_document_root(fm->doc);
-    if (!root || !fy_node_is_mapping(root))
+    cyaml_node_t* root = cyaml_root(fm->doc);
+    if (!root || !cyaml_is_map(root))
         return;
 
-    void* iter = NULL;
-    struct fy_node_pair* pair;
-    while ((pair = fy_node_mapping_iterate(root, &iter))) {
-        struct fy_node* k = fy_node_pair_key(pair);
-        struct fy_node* v = fy_node_pair_value(pair);
+    cyaml_pair_t* pair;
+    CYAML_EACH_MAP(root, pair, _i)
+    {
+        cyaml_node_t* k = pair->key;
+        cyaml_node_t* v = pair->val;
 
-        const char* key_str = k ? fy_node_get_scalar0(k) : NULL;
+        const char* key_str = get_cached_scalar((Frontmatter*)fm, k);
         const char* val_str = NULL;
-        FmType type = get_node_type(v);
+        FmType type = get_node_type((Frontmatter*)fm, v);
 
-        if (v && fy_node_is_scalar(v)) {
-            val_str = fy_node_get_scalar0(v);
+        if (v && cyaml_is_scalar(v)) {
+            val_str = get_cached_scalar((Frontmatter*)fm, v);
         }
 
         if (key_str) {
@@ -613,16 +630,11 @@ int fm_count(const Frontmatter* fm)
     if (!fm || !fm->doc)
         return 0;
 
-    struct fy_node* root = fy_document_root(fm->doc);
-    if (!root || !fy_node_is_mapping(root))
+    cyaml_node_t* root = cyaml_root(fm->doc);
+    if (!root || !cyaml_is_map(root))
         return 0;
 
-    int count = 0;
-    void* iter = NULL;
-    while (fy_node_mapping_iterate(root, &iter)) {
-        count++;
-    }
-    return count;
+    return (int)cyaml_map_len(root);
 }
 
 // #endregion

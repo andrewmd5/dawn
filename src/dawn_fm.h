@@ -6,9 +6,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-// Forward declare libfyaml types to avoid exposing header in public interface
-struct fy_document;
-
 // #region Frontmatter Types
 
 //! Opaque frontmatter handle
