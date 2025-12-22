@@ -102,7 +102,7 @@ void save_session(void)
     DAWN_BACKEND(app)->write_file(app.session_path, content, pos + txt_len);
 
     // Update history
-    hist_upsert(app.session_path, fm_get_string(fm, "title"));
+    hist_upsert(app.session_path, fm_get_string(fm, "title"), app.cursor);
 
     free(content);
     free(txt);

@@ -99,6 +99,12 @@ static void rebuild_history_array(void)
         format_date(e->timestamp, date_buf, sizeof(date_buf));
         entry->date_str = strdup(date_buf);
 
+        int64_t cursor_val = 0;
+        if (crdt_meta_get_int(e, "cursor", &cursor_val))
+            entry->cursor = (size_t)cursor_val;
+        else
+            entry->cursor = 0;
+
         app.hist_count++;
     }
 
@@ -273,7 +279,7 @@ void hist_shutdown(void)
 
 // #region Operations
 
-bool hist_upsert(const char* path, const char* title)
+bool hist_upsert(const char* path, const char* title, size_t cursor)
 {
     if (!path)
         return false;
@@ -285,6 +291,11 @@ bool hist_upsert(const char* path, const char* title)
 
     char* norm_path = normalize_path(path);
     crdt_upsert(hist_state, norm_path, title);
+
+    CrdtEntry* entry = crdt_find(hist_state, norm_path);
+    if (entry)
+        crdt_meta_set_int(entry, "cursor", (int64_t)cursor);
+
     free(norm_path);
 
     hist_save();

@@ -104,12 +104,14 @@ CrdtState* crdt_parse(const char* json, size_t len)
             {
                 const char* key = entry->string;
                 cJSON* value_j = cJSON_GetObjectItem(entry, "value");
+                cJSON* meta_j = cJSON_GetObjectItem(entry, "meta");
                 cJSON* ts_j = cJSON_GetObjectItem(entry, "ts");
                 cJSON* node_j = cJSON_GetObjectItem(entry, "node");
 
                 CrdtEntry* e = &state->entries[state->entry_count];
                 e->key = strdup(key);
                 e->value = (value_j && cJSON_IsString(value_j)) ? strdup(value_j->valuestring) : NULL;
+                e->meta = (meta_j && cJSON_IsObject(meta_j)) ? cJSON_Duplicate(meta_j, 1) : NULL;
                 e->timestamp = (ts_j && cJSON_IsNumber(ts_j)) ? (int64_t)ts_j->valuedouble : 0;
                 if (node_j && cJSON_IsString(node_j)) {
                     dawn_strncpy(e->node, node_j->valuestring, CRDT_NODE_ID_LEN);
@@ -161,6 +163,8 @@ char* crdt_serialize(const CrdtState* state)
         cJSON* entry = cJSON_CreateObject();
         if (e->value)
             cJSON_AddStringToObject(entry, "value", e->value);
+        if (e->meta)
+            cJSON_AddItemToObject(entry, "meta", cJSON_Duplicate(e->meta, 1));
         cJSON_AddNumberToObject(entry, "ts", (double)e->timestamp);
         cJSON_AddStringToObject(entry, "node", e->node);
         cJSON_AddItemToObject(entries, e->key, entry);
@@ -276,6 +280,7 @@ CrdtState* crdt_merge(const CrdtState* a, const CrdtState* b)
                 CrdtEntry* e = &result->entries[result->entry_count++];
                 e->key = strdup(best_entry->key);
                 e->value = best_entry->value ? strdup(best_entry->value) : NULL;
+                e->meta = best_entry->meta ? cJSON_Duplicate(best_entry->meta, 1) : NULL;
                 e->timestamp = best_entry->timestamp;
                 dawn_strncpy(e->node, best_entry->node, CRDT_NODE_ID_LEN);
             } else {
@@ -288,6 +293,7 @@ CrdtState* crdt_merge(const CrdtState* a, const CrdtState* b)
             CrdtEntry* e = &result->entries[result->entry_count++];
             e->key = strdup(best_entry->key);
             e->value = best_entry->value ? strdup(best_entry->value) : NULL;
+            e->meta = best_entry->meta ? cJSON_Duplicate(best_entry->meta, 1) : NULL;
             e->timestamp = best_entry->timestamp;
             dawn_strncpy(e->node, best_entry->node, CRDT_NODE_ID_LEN);
         } else if (best_tomb) {
@@ -310,6 +316,8 @@ void crdt_free(CrdtState* state)
     for (int32_t i = 0; i < state->entry_count; i++) {
         free(state->entries[i].key);
         free(state->entries[i].value);
+        if (state->entries[i].meta)
+            cJSON_Delete(state->entries[i].meta);
     }
     free(state->entries);
 
@@ -429,6 +437,53 @@ CrdtEntry** crdt_get_live(const CrdtState* state, int32_t* count)
     qsort(live, (size_t)n, sizeof(CrdtEntry*), entry_cmp_desc);
     *count = n;
     return live;
+}
+
+// #endregion
+
+// #region Metadata
+
+void crdt_meta_set_str(CrdtEntry* entry, const char* meta_key, const char* meta_value)
+{
+    if (!entry || !meta_key)
+        return;
+    if (!entry->meta)
+        entry->meta = cJSON_CreateObject();
+    cJSON_DeleteItemFromObject(entry->meta, meta_key);
+    if (meta_value)
+        cJSON_AddStringToObject(entry->meta, meta_key, meta_value);
+}
+
+void crdt_meta_set_int(CrdtEntry* entry, const char* meta_key, int64_t meta_value)
+{
+    if (!entry || !meta_key)
+        return;
+    if (!entry->meta)
+        entry->meta = cJSON_CreateObject();
+    cJSON_DeleteItemFromObject(entry->meta, meta_key);
+    cJSON_AddNumberToObject(entry->meta, meta_key, (double)meta_value);
+}
+
+const char* crdt_meta_get_str(const CrdtEntry* entry, const char* meta_key)
+{
+    if (!entry || !entry->meta || !meta_key)
+        return NULL;
+    cJSON* item = cJSON_GetObjectItem(entry->meta, meta_key);
+    if (item && cJSON_IsString(item))
+        return item->valuestring;
+    return NULL;
+}
+
+bool crdt_meta_get_int(const CrdtEntry* entry, const char* meta_key, int64_t* out)
+{
+    if (!entry || !entry->meta || !meta_key || !out)
+        return false;
+    cJSON* item = cJSON_GetObjectItem(entry->meta, meta_key);
+    if (item && cJSON_IsNumber(item)) {
+        *out = (int64_t)item->valuedouble;
+        return true;
+    }
+    return false;
 }
 
 // #endregion

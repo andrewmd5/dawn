@@ -11,10 +11,11 @@
 
 // #region Types
 
-//! CRDT entry with key-value pair and vector clock
+//! CRDT entry with key-value pair, metadata, and vector clock
 typedef struct {
     char* key;
     char* value;
+    struct cJSON* meta; //!< Arbitrary key-value metadata (owned, can be NULL)
     int64_t timestamp;
     char node[CRDT_NODE_ID_LEN + 1];
 } CrdtEntry;
@@ -90,6 +91,35 @@ CrdtEntry* crdt_find(const CrdtState* state, const char* key);
 //! @param count Output: number of entries returned
 //! @return Array of entry pointers (caller must free array, not entries)
 CrdtEntry** crdt_get_live(const CrdtState* state, int32_t* count);
+
+// #endregion
+
+// #region Metadata
+
+//! Set a string metadata value on an entry
+//! @param entry Entry to modify
+//! @param meta_key Metadata key
+//! @param meta_value String value (will be copied)
+void crdt_meta_set_str(CrdtEntry* entry, const char* meta_key, const char* meta_value);
+
+//! Set an integer metadata value on an entry
+//! @param entry Entry to modify
+//! @param meta_key Metadata key
+//! @param meta_value Integer value
+void crdt_meta_set_int(CrdtEntry* entry, const char* meta_key, int64_t meta_value);
+
+//! Get a string metadata value from an entry
+//! @param entry Entry to read
+//! @param meta_key Metadata key
+//! @return String value or NULL if not found/not string
+const char* crdt_meta_get_str(const CrdtEntry* entry, const char* meta_key);
+
+//! Get an integer metadata value from an entry
+//! @param entry Entry to read
+//! @param meta_key Metadata key
+//! @param out Output value
+//! @return true if found and is number, false otherwise
+bool crdt_meta_get_int(const CrdtEntry* entry, const char* meta_key, int64_t* out);
 
 // #endregion
 

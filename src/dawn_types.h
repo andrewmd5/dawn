@@ -148,6 +148,7 @@ typedef struct {
     char* path; //!< Full path to .md file
     char* title; //!< Document title from frontmatter
     char* date_str; //!< Formatted modification date
+    size_t cursor; //!< Last cursor position
 } HistoryEntry;
 
 // #endregion

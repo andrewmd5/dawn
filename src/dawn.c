@@ -465,6 +465,20 @@ static void restore_undo_state(int32_t pos)
         app.cursor = len;
 }
 
+//! Restore cursor to a saved position, clamping to buffer bounds and UTF-8 boundary
+static void restore_cursor_position(size_t pos)
+{
+    size_t len = gap_len(&app.text);
+    if (pos > len)
+        pos = len;
+    if (pos > 0 && pos < len) {
+        size_t adjusted = gap_utf8_prev(&app.text, pos + 1);
+        if (adjusted < pos)
+            pos = adjusted;
+    }
+    app.cursor = pos;
+}
+
 static void undo(void)
 {
     if (app.undo_pos > 0) {
@@ -4131,8 +4145,11 @@ static void handle_input(void)
         case 'o':
         case '\r':
         case '\n':
-            if (app.hist_count > 0)
-                load_file_for_editing(app.history[app.hist_sel].path);
+            if (app.hist_count > 0) {
+                HistoryEntry* entry = &app.history[app.hist_sel];
+                load_file_for_editing(entry->path);
+                restore_cursor_position(entry->cursor);
+            }
             break;
         case 'e':
             if (app.hist_count > 0)
@@ -4140,7 +4157,9 @@ static void handle_input(void)
             break;
         case 't':
             if (app.hist_count > 0) {
-                load_file_for_editing(app.history[app.hist_sel].path);
+                HistoryEntry* entry = &app.history[app.hist_sel];
+                load_file_for_editing(entry->path);
+                restore_cursor_position(entry->cursor);
                 fm_edit_init();
                 MODE_PUSH(MODE_FM_EDIT);
             }
