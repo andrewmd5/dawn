@@ -426,7 +426,21 @@ static bool query_text_sizing(void)
     if (!term_parse_cpr(buf2, len2, &row2, &col2))
         return false;
 
-    return (row1 == row2 && col2 - col1 == 2);
+    query_write(ESC "]66;s=2; " ESC "\\", sizeof(ESC "]66;s=2; " ESC "\\") - 1);
+
+    query_write(CSI "6n", sizeof(CSI "6n") - 1);
+
+    char buf3[32];
+    size_t len3 = read_response(buf3, sizeof(buf3), 'R', 100);
+
+    int32_t row3, col3;
+    if (!term_parse_cpr(buf3, len3, &row3, &col3))
+        return false;
+
+    // Width support: col2 - col1 == 2
+    // Scale support: col3 - col2 == 2
+    // Both must be supported
+    return (row1 == row2 && row2 == row3 && col2 - col1 == 2 && col3 - col2 == 2);
 }
 
 static void detect_capabilities(void)
