@@ -302,6 +302,47 @@ static inline Block* get_image_block_at(size_t pos)
     return b;
 }
 
+//! Check if we just typed a list marker and should auto-insert a space
+//! Called after inserting a character. Checks if cursor is right after a list marker.
+//! @param key the character that was just typed
+static inline void check_auto_list_space(int32_t key)
+{
+    // Only check for '.' ')' '-' '*' '+'
+    if (key != '.' && key != ')' && key != '-' && key != '*' && key != '+')
+        return;
+
+    size_t len = gap_len(&app.text);
+    if (app.cursor == 0 || app.cursor > len)
+        return;
+
+    // Find line start
+    size_t line_start = app.cursor;
+    while (line_start > 0 && gap_at(&app.text, line_start - 1) != '\n')
+        line_start--;
+
+    // Skip leading spaces
+    size_t p = line_start;
+    while (p < app.cursor && gap_at(&app.text, p) == ' ')
+        p++;
+
+    if (key == '-' || key == '*' || key == '+') {
+        // Unordered list: marker must be at p, cursor right after it
+        if (p + 1 == app.cursor && gap_at(&app.text, p) == (char)key) {
+            gap_insert(&app.text, app.cursor++, ' ');
+        }
+    } else {
+        // Ordered list: digits followed by . or )
+        // Check if we have digits then the marker we just typed
+        size_t digit_start = p;
+        while (p < app.cursor && gap_at(&app.text, p) >= '0' && gap_at(&app.text, p) <= '9')
+            p++;
+        // Need at least one digit, and cursor should be right after the marker
+        if (p > digit_start && p + 1 == app.cursor && gap_at(&app.text, p) == (char)key) {
+            gap_insert(&app.text, app.cursor++, ' ');
+        }
+    }
+}
+
 //! Get current text width for word wrapping
 static inline int32_t get_text_width(void) { return calc_layout().text_width; }
 
@@ -3848,8 +3889,10 @@ static void handle_writing(int32_t key)
             if (len > 0) {
                 gap_insert_str(&app.text, app.cursor, (char*)utf8_buf, (size_t)len);
                 app.cursor += (size_t)len;
-                if (key < 128)
+                if (key < 128) {
                     check_auto_newline((char)key);
+                    check_auto_list_space(key);
+                }
                 if (key == ']')
                     footnote_maybe_create_at_cursor(&app.text, app.cursor);
             }
