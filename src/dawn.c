@@ -3333,7 +3333,7 @@ static void new_session(void)
 #else
     snprintf(path, sizeof(path), "%s/%s.md", history_dir(), timestamp);
 #endif
-    app.session_path = strdup(path);
+    app.session_path = dawn_strdup(path);
 
     fm_free(app.frontmatter);
     app.frontmatter = fm_create();
@@ -4166,7 +4166,7 @@ static void handle_input(void)
             break;
         case 'd':
             if (app.hist_count > 0) {
-                char* path = strdup(app.history[app.hist_sel].path);
+                char* path = dawn_strdup(app.history[app.hist_sel].path);
                 hist_remove(path);
                 free(path);
                 if (app.hist_sel >= app.hist_count && app.hist_sel > 0)

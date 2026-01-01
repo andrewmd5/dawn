@@ -109,8 +109,8 @@ CrdtState* crdt_parse(const char* json, size_t len)
                 cJSON* node_j = cJSON_GetObjectItem(entry, "node");
 
                 CrdtEntry* e = &state->entries[state->entry_count];
-                e->key = strdup(key);
-                e->value = (value_j && cJSON_IsString(value_j)) ? strdup(value_j->valuestring) : NULL;
+                e->key = dawn_strdup(key);
+                e->value = (value_j && cJSON_IsString(value_j)) ? dawn_strdup(value_j->valuestring) : NULL;
                 e->meta = (meta_j && cJSON_IsObject(meta_j)) ? cJSON_Duplicate(meta_j, 1) : NULL;
                 e->timestamp = (ts_j && cJSON_IsNumber(ts_j)) ? (int64_t)ts_j->valuedouble : 0;
                 if (node_j && cJSON_IsString(node_j)) {
@@ -134,7 +134,7 @@ CrdtState* crdt_parse(const char* json, size_t len)
                 cJSON* node_j = cJSON_GetObjectItem(tomb, "node");
 
                 CrdtTombstone* t = &state->tombstones[state->tombstone_count];
-                t->key = strdup(key);
+                t->key = dawn_strdup(key);
                 t->timestamp = (ts_j && cJSON_IsNumber(ts_j)) ? (int64_t)ts_j->valuedouble : 0;
                 if (node_j && cJSON_IsString(node_j)) {
                     dawn_strncpy(t->node, node_j->valuestring, CRDT_NODE_ID_LEN);
@@ -278,27 +278,27 @@ CrdtState* crdt_merge(const CrdtState* a, const CrdtState* b)
             int cmp = crdt_compare(best_entry->timestamp, best_entry->node, best_tomb->timestamp, best_tomb->node);
             if (cmp >= 0) {
                 CrdtEntry* e = &result->entries[result->entry_count++];
-                e->key = strdup(best_entry->key);
-                e->value = best_entry->value ? strdup(best_entry->value) : NULL;
+                e->key = dawn_strdup(best_entry->key);
+                e->value = best_entry->value ? dawn_strdup(best_entry->value) : NULL;
                 e->meta = best_entry->meta ? cJSON_Duplicate(best_entry->meta, 1) : NULL;
                 e->timestamp = best_entry->timestamp;
                 dawn_strncpy(e->node, best_entry->node, CRDT_NODE_ID_LEN);
             } else {
                 CrdtTombstone* t = &result->tombstones[result->tombstone_count++];
-                t->key = strdup(best_tomb->key);
+                t->key = dawn_strdup(best_tomb->key);
                 t->timestamp = best_tomb->timestamp;
                 dawn_strncpy(t->node, best_tomb->node, CRDT_NODE_ID_LEN);
             }
         } else if (best_entry) {
             CrdtEntry* e = &result->entries[result->entry_count++];
-            e->key = strdup(best_entry->key);
-            e->value = best_entry->value ? strdup(best_entry->value) : NULL;
+            e->key = dawn_strdup(best_entry->key);
+            e->value = best_entry->value ? dawn_strdup(best_entry->value) : NULL;
             e->meta = best_entry->meta ? cJSON_Duplicate(best_entry->meta, 1) : NULL;
             e->timestamp = best_entry->timestamp;
             dawn_strncpy(e->node, best_entry->node, CRDT_NODE_ID_LEN);
         } else if (best_tomb) {
             CrdtTombstone* t = &result->tombstones[result->tombstone_count++];
-            t->key = strdup(best_tomb->key);
+            t->key = dawn_strdup(best_tomb->key);
             t->timestamp = best_tomb->timestamp;
             dawn_strncpy(t->node, best_tomb->node, CRDT_NODE_ID_LEN);
         }
@@ -353,14 +353,15 @@ void crdt_upsert(CrdtState* state, const char* key, const char* value)
     CrdtEntry* existing = find_entry_internal(state, key);
     if (existing) {
         free(existing->value);
-        existing->value = value ? strdup(value) : NULL;
+        existing->value = value ? dawn_strdup(value) : NULL;
         existing->timestamp = ts;
         dawn_strncpy(existing->node, state->node, CRDT_NODE_ID_LEN);
     } else {
         state->entries = realloc(state->entries, sizeof(CrdtEntry) * (size_t)(state->entry_count + 1));
         CrdtEntry* e = &state->entries[state->entry_count++];
-        e->key = strdup(key);
-        e->value = value ? strdup(value) : NULL;
+        e->key = dawn_strdup(key);
+        e->value = value ? dawn_strdup(value) : NULL;
+        e->meta = NULL;
         e->timestamp = ts;
         dawn_strncpy(e->node, state->node, CRDT_NODE_ID_LEN);
     }
@@ -380,7 +381,7 @@ void crdt_remove(CrdtState* state, const char* key)
     } else {
         state->tombstones = realloc(state->tombstones, sizeof(CrdtTombstone) * (size_t)(state->tombstone_count + 1));
         CrdtTombstone* t = &state->tombstones[state->tombstone_count++];
-        t->key = strdup(key);
+        t->key = dawn_strdup(key);
         t->timestamp = ts;
         dawn_strncpy(t->node, state->node, CRDT_NODE_ID_LEN);
     }
@@ -447,8 +448,11 @@ void crdt_meta_set_str(CrdtEntry* entry, const char* meta_key, const char* meta_
 {
     if (!entry || !meta_key)
         return;
-    if (!entry->meta)
+    if (!entry->meta) {
         entry->meta = cJSON_CreateObject();
+        if (!entry->meta)
+            return;
+    }
     cJSON_DeleteItemFromObject(entry->meta, meta_key);
     if (meta_value)
         cJSON_AddStringToObject(entry->meta, meta_key, meta_value);
@@ -458,8 +462,11 @@ void crdt_meta_set_int(CrdtEntry* entry, const char* meta_key, int64_t meta_valu
 {
     if (!entry || !meta_key)
         return;
-    if (!entry->meta)
+    if (!entry->meta) {
         entry->meta = cJSON_CreateObject();
+        if (!entry->meta)
+            return;
+    }
     cJSON_DeleteItemFromObject(entry->meta, meta_key);
     cJSON_AddNumberToObject(entry->meta, meta_key, (double)meta_value);
 }

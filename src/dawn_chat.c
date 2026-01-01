@@ -2,6 +2,7 @@
 
 #include "dawn_chat.h"
 #include "cJSON.h"
+#include "dawn_utils.h"
 #include "dawn_file.h"
 #include "dawn_gap.h"
 #include "dawn_nav.h"
@@ -12,7 +13,7 @@ void chat_add(const char* text, bool is_user)
 {
     app.chat_msgs = realloc(app.chat_msgs, sizeof(ChatMessage) * (size_t)(app.chat_count + 1));
     ChatMessage* m = &app.chat_msgs[app.chat_count++];
-    m->text = strdup(text);
+    m->text = dawn_strdup(text);
     m->len = strlen(text);
     m->is_user = is_user;
 }
@@ -49,7 +50,7 @@ static void ai_stream_cb(ai_context_t* context, const char* chunk, void* user_da
             if (app.chat_count > 0 && !app.chat_msgs[app.chat_count - 1].is_user) {
                 ChatMessage* m = &app.chat_msgs[app.chat_count - 1];
                 free(m->text);
-                m->text = strdup(chunk);
+                m->text = dawn_strdup(chunk);
                 m->len = strlen(chunk);
             }
             app.ai_thinking = false;

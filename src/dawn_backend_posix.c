@@ -8,6 +8,7 @@
 
 #include "dawn_backend.h"
 #include "dawn_wrap.h"
+#include "dawn_utils.h"
 
 #include <assert.h>
 #include <dirent.h>
@@ -1589,7 +1590,7 @@ static bool posix_list_dir(const char* path, char*** out_names, int32_t* out_cou
             cap *= 2;
             names = realloc(names, sizeof(char*) * (size_t)cap);
         }
-        names[count++] = strdup(e->d_name);
+        names[count++] = dawn_strdup(e->d_name);
     }
     closedir(d);
 
@@ -1762,7 +1763,7 @@ static uint32_t transmit_to_terminal(const char* path)
             sizeof(TransmittedImage) * (MAX_TRANSMITTED_IMAGES - 1));
         entry = &transmitted_images[MAX_TRANSMITTED_IMAGES - 1];
     }
-    entry->path = strdup(path);
+    entry->path = dawn_strdup(path);
     entry->image_id = image_id;
     entry->mtime = posix_get_mtime(path);
 
@@ -1943,7 +1944,7 @@ static void mark_url_failed(const char* url)
         memmove(&failed_urls[0], &failed_urls[1], sizeof(char*) * (MAX_FAILED_URLS - 1));
         failed_url_count--;
     }
-    failed_urls[failed_url_count++] = strdup(url);
+    failed_urls[failed_url_count++] = dawn_strdup(url);
 }
 
 static bool is_download_in_progress(const char* url)
@@ -2069,9 +2070,9 @@ static bool start_async_download(const char* url, const char* temp_path, const c
     curl_multi_add_handle(curl_multi_handle, easy);
 
     AsyncDownload* dl = &downloads[download_count++];
-    dl->url = strdup(url);
-    dl->temp_path = strdup(temp_path);
-    dl->final_path = strdup(final_path);
+    dl->url = dawn_strdup(url);
+    dl->temp_path = dawn_strdup(temp_path);
+    dl->final_path = dawn_strdup(final_path);
     dl->fp = fp;
     dl->easy = easy;
 

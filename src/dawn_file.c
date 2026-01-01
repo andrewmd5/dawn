@@ -196,7 +196,7 @@ static void load_content(char* content, size_t size, const char* path)
     size_t text_len = strlen(text_start);
     if (text_len > 0) {
         // Need mutable copy for normalize
-        char* mutable_text = strdup(text_start);
+        char* mutable_text = dawn_strdup(text_start);
         text_len = normalize_line_endings(mutable_text, text_len);
         gap_insert_str(&app.text, 0, mutable_text, text_len);
         free(mutable_text);
@@ -207,7 +207,7 @@ static void load_content(char* content, size_t size, const char* path)
 
     // Reset editor state
     free(app.session_path);
-    app.session_path = path ? strdup(path) : NULL;
+    app.session_path = path ? dawn_strdup(path) : NULL;
     app.cursor = 0;
     app.scroll_y = 0;
     app.selecting = false;

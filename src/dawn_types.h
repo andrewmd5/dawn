@@ -9,7 +9,6 @@
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
-#define strdup _strdup
 #endif
 
 // #endregion

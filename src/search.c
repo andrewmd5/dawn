@@ -2,6 +2,7 @@
 //! Provides web search via DuckDuckGo and tool callbacks for AI
 
 #include "search.h"
+#include "dawn_utils.h"
 #include "cJSON.h"
 #include <curl/curl.h>
 #include <stdio.h>
@@ -80,7 +81,7 @@ char* search_web(const char* query)
 {
     CURL* curl = curl_easy_init();
     if (!curl)
-        return strdup("Search failed: could not initialize");
+        return dawn_strdup("Search failed: could not initialize");
 
     // First try DuckDuckGo instant answer API for direct answers
     char* encoded = curl_easy_escape(curl, query, 0);
@@ -231,12 +232,12 @@ char* search_tool_callback(const char* params_json, void* user_data)
 
     cJSON* params = cJSON_Parse(params_json);
     if (!params)
-        return strdup("{\"error\": \"Invalid parameters\"}");
+        return dawn_strdup("{\"error\": \"Invalid parameters\"}");
 
     cJSON* query = cJSON_GetObjectItem(params, "query");
     if (!query || !query->valuestring) {
         cJSON_Delete(params);
-        return strdup("{\"error\": \"Missing query parameter\"}");
+        return dawn_strdup("{\"error\": \"Missing query parameter\"}");
     }
 
     char* result = search_web(query->valuestring);
@@ -287,7 +288,7 @@ char* sessions_tool_callback(const char* params_json, void* user_data)
 {
     const char* history_dir = (const char*)user_data;
     if (!history_dir) {
-        return strdup("{\"error\": \"History directory not configured\"}");
+        return dawn_strdup("{\"error\": \"History directory not configured\"}");
     }
 
     cJSON* params = cJSON_Parse(params_json);

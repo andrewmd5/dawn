@@ -6,6 +6,7 @@
 
 #include "dawn_args.h"
 #include "dawn_compat.h"
+#include "dawn_utils.h"
 #include "dawn_types.h"
 
 #include <stdio.h>
@@ -37,7 +38,7 @@ static char* resolve_path(const char* path)
 
     // Already absolute
     if (path[0] == '/') {
-        return strdup(path);
+        return dawn_strdup(path);
     }
 
     // Home directory expansion
@@ -64,7 +65,7 @@ static char* resolve_path(const char* path)
         return result;
     }
 
-    return strdup(path);
+    return dawn_strdup(path);
 }
 
 //! Parse theme argument

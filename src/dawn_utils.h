@@ -25,24 +25,18 @@
 //! Safe string copy using memcpy, always null-terminates
 //! @param dest destination buffer (must be at least strlen(src)+1 bytes)
 //! @param src source string
-static inline void dawn_strcpy(char* dest, const char* src)
-{
-    size_t len = strlen(src);
-    memcpy(dest, src, len + 1);
-}
+void dawn_strcpy(char* dest, const char* src);
+
+//! Duplicate a UTF-8 string (malloc), returns NULL on failure
+//! @param string source string
+//! @return duplicated string (must be freed), or NULL
+char* dawn_strdup(const char* string);
 
 //! Safe string copy with max length, always null-terminates
 //! @param dest destination buffer (must be at least n+1 bytes)
 //! @param src source string
 //! @param n max bytes to copy (not including null terminator)
-static inline void dawn_strncpy(char* dest, const char* src, size_t n)
-{
-    size_t len = strlen(src);
-    if (len > n)
-        len = n;
-    memcpy(dest, src, len);
-    dest[len] = '\0';
-}
+void dawn_strncpy(char* dest, const char* src, size_t n);
 
 // #endregion
 
@@ -129,30 +123,14 @@ int32_t output_grapheme_str(const char* text, size_t len, size_t* pos);
 //! @param str string buffer
 //! @param pos current byte position
 //! @return byte position of previous character start (0 if at beginning)
-static inline int32_t str_utf8_prev(const char* str, int32_t pos)
-{
-    if (pos <= 0)
-        return 0;
-    pos--;
-    while (pos > 0 && (str[pos] & 0xC0) == 0x80)
-        pos--;
-    return pos;
-}
+int32_t str_utf8_prev(const char* str, int32_t pos);
 
 //! Find start of next UTF-8 character in a string
 //! @param str string buffer
 //! @param pos current byte position
 //! @param len total string length
 //! @return byte position after current character (len if at end)
-static inline int32_t str_utf8_next(const char* str, int32_t pos, int32_t len)
-{
-    if (pos >= len)
-        return len;
-    pos++;
-    while (pos < len && (str[pos] & 0xC0) == 0x80)
-        pos++;
-    return pos;
-}
+int32_t str_utf8_next(const char* str, int32_t pos, int32_t len);
 
 //! Append a Unicode codepoint (as UTF-8) to a string buffer
 //! @param buf string buffer
@@ -160,17 +138,7 @@ static inline int32_t str_utf8_next(const char* str, int32_t pos, int32_t len)
 //! @param len pointer to current string length (updated on success)
 //! @param codepoint Unicode codepoint to append
 //! @return true if appended, false if buffer full
-static inline bool str_append_codepoint(char* buf, size_t buf_size, size_t* len, int32_t codepoint)
-{
-    uint8_t utf8_buf[4];
-    utf8proc_ssize_t utf8_len = utf8proc_encode_char((utf8proc_int32_t)codepoint, utf8_buf);
-    if (utf8_len <= 0 || *len + (size_t)utf8_len >= buf_size)
-        return false;
-    memcpy(buf + *len, utf8_buf, (size_t)utf8_len);
-    *len += (size_t)utf8_len;
-    buf[*len] = '\0';
-    return true;
-}
+bool str_append_codepoint(char* buf, size_t buf_size, size_t* len, int32_t codepoint);
 
 //! Insert a Unicode codepoint (as UTF-8) into a string buffer at cursor position
 //! @param buf string buffer
@@ -179,18 +147,7 @@ static inline bool str_append_codepoint(char* buf, size_t buf_size, size_t* len,
 //! @param cursor pointer to cursor position (updated on success)
 //! @param codepoint Unicode codepoint to insert
 //! @return true if inserted, false if buffer full
-static inline bool str_insert_codepoint(char* buf, size_t buf_size, size_t* len, size_t* cursor, int32_t codepoint)
-{
-    uint8_t utf8_buf[4];
-    utf8proc_ssize_t utf8_len = utf8proc_encode_char((utf8proc_int32_t)codepoint, utf8_buf);
-    if (utf8_len <= 0 || *len + (size_t)utf8_len >= buf_size)
-        return false;
-    memmove(buf + *cursor + utf8_len, buf + *cursor, *len - *cursor);
-    memcpy(buf + *cursor, utf8_buf, (size_t)utf8_len);
-    *len += (size_t)utf8_len;
-    *cursor += (size_t)utf8_len;
-    return true;
-}
+bool str_insert_codepoint(char* buf, size_t buf_size, size_t* len, size_t* cursor, int32_t codepoint);
 
 // #endregion
 

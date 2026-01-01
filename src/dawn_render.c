@@ -64,7 +64,7 @@ void render_clear(void)
 void render_center_text(int32_t row, const char* text, DawnColor fg)
 {
     int32_t len = (int32_t)strlen(text);
-    int32_t col = (app.cols - len) / 2;
+    int32_t col = (app.cols - len + 2) / 2;
     if (col < 1)
         col = 1;
     move_to(row, col);
@@ -162,7 +162,7 @@ void render_welcome(void)
 
     set_fg(get_fg());
     for (int32_t i = 0; i < logo_height; i++) {
-        int32_t col = (app.cols - logo_width) / 2;
+        int32_t col = (app.cols - logo_width + 2) / 2;
         if (col < 1)
             col = 1;
         move_to(logo_start + i, col);

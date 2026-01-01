@@ -6,6 +6,93 @@
 #include "dawn_theme.h"
 #include "dawn_wrap.h"
 
+// #region String Utilities
+
+void dawn_strcpy(char* dest, const char* src)
+{
+    size_t len = strlen(src);
+    memcpy(dest, src, len + 1);
+}
+
+char* dawn_strdup(const char* string)
+{
+    size_t length = 0;
+    char* copy = NULL;
+
+    if (string == NULL) {
+        return NULL;
+    }
+
+    length = strlen((const char*)string) + sizeof("");
+    copy = malloc(length);
+    if (copy == NULL) {
+        return NULL;
+    }
+    memcpy(copy, string, length);
+
+    return copy;
+}
+
+void dawn_strncpy(char* dest, const char* src, size_t n)
+{
+    size_t len = strlen(src);
+    if (len > n)
+        len = n;
+    memcpy(dest, src, len);
+    dest[len] = '\0';
+}
+
+// #endregion
+
+// #region UTF-8 String Navigation
+
+int32_t str_utf8_prev(const char* str, int32_t pos)
+{
+    if (pos <= 0)
+        return 0;
+    pos--;
+    while (pos > 0 && (str[pos] & 0xC0) == 0x80)
+        pos--;
+    return pos;
+}
+
+int32_t str_utf8_next(const char* str, int32_t pos, int32_t len)
+{
+    if (pos >= len)
+        return len;
+    pos++;
+    while (pos < len && (str[pos] & 0xC0) == 0x80)
+        pos++;
+    return pos;
+}
+
+bool str_append_codepoint(char* buf, size_t buf_size, size_t* len, int32_t codepoint)
+{
+    uint8_t utf8_buf[4];
+    utf8proc_ssize_t utf8_len = utf8proc_encode_char((utf8proc_int32_t)codepoint, utf8_buf);
+    if (utf8_len <= 0 || *len + (size_t)utf8_len >= buf_size)
+        return false;
+    memcpy(buf + *len, utf8_buf, (size_t)utf8_len);
+    *len += (size_t)utf8_len;
+    buf[*len] = '\0';
+    return true;
+}
+
+bool str_insert_codepoint(char* buf, size_t buf_size, size_t* len, size_t* cursor, int32_t codepoint)
+{
+    uint8_t utf8_buf[4];
+    utf8proc_ssize_t utf8_len = utf8proc_encode_char((utf8proc_int32_t)codepoint, utf8_buf);
+    if (utf8_len <= 0 || *len + (size_t)utf8_len >= buf_size)
+        return false;
+    memmove(buf + *cursor + utf8_len, buf + *cursor, *len - *cursor);
+    memcpy(buf + *cursor, utf8_buf, (size_t)utf8_len);
+    *len += (size_t)utf8_len;
+    *cursor += (size_t)utf8_len;
+    return true;
+}
+
+// #endregion
+
 //! Current text scale for output (1-7, 1=normal)
 int32_t current_text_scale = 1;
 

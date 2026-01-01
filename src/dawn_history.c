@@ -41,7 +41,7 @@ static char* normalize_path(const char* path)
 {
     if (!path)
         return NULL;
-    char* result = strdup(path);
+    char* result = dawn_strdup(path);
 #ifdef _WIN32
     for (char* p = result; *p; p++) {
         if (*p == '/')
@@ -92,12 +92,12 @@ static void rebuild_history_array(void)
             continue;
 
         HistoryEntry* entry = &app.history[app.hist_count];
-        entry->path = strdup(e->key);
-        entry->title = e->value ? strdup(e->value) : NULL;
+        entry->path = dawn_strdup(e->key);
+        entry->title = e->value ? dawn_strdup(e->value) : NULL;
 
         char date_buf[64];
         format_date(e->timestamp, date_buf, sizeof(date_buf));
-        entry->date_str = strdup(date_buf);
+        entry->date_str = dawn_strdup(date_buf);
 
         int64_t cursor_val = 0;
         if (crdt_meta_get_int(e, "cursor", &cursor_val))
