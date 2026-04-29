@@ -27,6 +27,7 @@ typedef struct {
     char* demo_file; //!< File to replay in demo mode
     const char* error_msg; //!< Error message
     int8_t theme; //!< Theme: -1 = not set, 0 = light, 1 = dark
+    int32_t timer_mins; //!< Timer override in minutes; -1 if not set, 0 disables
     uint8_t flags; //!< ArgFlag combination
 } DawnArgs;
 

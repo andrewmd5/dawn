@@ -19,6 +19,7 @@
 #include "dawn_nav.h"
 #include "dawn_render.h"
 #include "dawn_search.h"
+#include "dawn_settings.h"
 #include "dawn_tex.h"
 #include "dawn_theme.h"
 #include "dawn_timer.h"
@@ -4084,6 +4085,7 @@ static void handle_input(void)
             app.theme = (app.theme == THEME_DARK) ? THEME_LIGHT : THEME_DARK;
             highlight_cleanup(app.hl_ctx);
             app.hl_ctx = highlight_init(app.theme == THEME_DARK);
+            settings_save();
             break;
         case '?':
             MODE_PUSH(MODE_HELP);
@@ -4101,12 +4103,14 @@ static void handle_input(void)
             if (app.preset_idx > 0)
                 app.preset_idx--;
             app.timer_mins = TIMER_PRESETS[app.preset_idx];
+            settings_save();
             break;
         case 'j':
         case DAWN_KEY_DOWN:
             if (app.preset_idx < (int32_t)NUM_PRESETS - 1)
                 app.preset_idx++;
             app.timer_mins = TIMER_PRESETS[app.preset_idx];
+            settings_save();
             break;
         case '\r':
         case '\n':
@@ -4843,17 +4847,34 @@ static void handle_input(void)
 
 // #region Engine API
 
-bool dawn_engine_init(Theme theme)
+bool dawn_engine_init(int8_t theme_override, int32_t timer_override)
 {
     app.timer_mins = DEFAULT_TIMER_MINUTES;
     app.mode = MODE_WELCOME;
-    app.theme = theme;
+    app.theme = THEME_DARK;
     app.style = STYLE_MINIMAL;
 
     for (size_t i = 0; i < NUM_PRESETS; i++) {
         if (TIMER_PRESETS[i] == DEFAULT_TIMER_MINUTES) {
             app.preset_idx = (int32_t)i;
             break;
+        }
+    }
+
+    // Apply persisted preferences. CLI overrides win over what's on disk
+    // so user-supplied flags are honored even if settings exist.
+    settings_load();
+    if (theme_override >= 0) {
+        app.theme = (Theme)theme_override;
+    }
+    if (timer_override >= 0) {
+        app.timer_mins = timer_override;
+        app.preset_idx = 0;
+        for (size_t i = 0; i < NUM_PRESETS; i++) {
+            if (TIMER_PRESETS[i] == timer_override) {
+                app.preset_idx = (int32_t)i;
+                break;
+            }
         }
     }
 
@@ -4864,7 +4885,7 @@ bool dawn_engine_init(Theme theme)
     if (app.block_cache)
         block_cache_init((BlockCache*)app.block_cache);
 
-    app.hl_ctx = highlight_init(theme == THEME_DARK);
+    app.hl_ctx = highlight_init(app.theme == THEME_DARK);
     dawn_update_size();
 
 #if HAS_LIBAI

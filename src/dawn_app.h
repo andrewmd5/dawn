@@ -10,9 +10,12 @@
 
 //! Initialize the Dawn engine
 //! Must be called after platform_init() has been called by the frontend
-//! @param theme color theme to use
+//! @param theme_override color theme to apply unconditionally,
+//!        or -1 to fall back to persisted settings (default: dark)
+//! @param timer_override timer minutes to apply unconditionally,
+//!        or -1 to fall back to persisted settings (0 disables timer)
 //! @return true on success
-bool dawn_engine_init(Theme theme);
+bool dawn_engine_init(int8_t theme_override, int32_t timer_override);
 
 //! Shutdown the Dawn engine
 //! Frontend should call platform_shutdown() after this

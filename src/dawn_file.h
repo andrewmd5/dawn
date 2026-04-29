@@ -8,8 +8,17 @@
 // #region History Directory
 
 //! Get path to history/sessions directory
-//! @return static buffer with path to ~/.dawn
+//! Prefers XDG_DATA_HOME/dawn (or ~/.local/share/dawn) on POSIX systems.
+//! Falls back to ~/.dawn if that legacy path already exists, for
+//! backwards compatibility with installs that predate XDG support.
+//! @return static buffer with the resolved path
 char* history_dir(void);
+
+//! Get path to configuration directory
+//! Uses XDG_CONFIG_HOME/dawn (or ~/.config/dawn) on POSIX systems,
+//! and %APPDATA%\dawn on Windows.
+//! @return static buffer with the resolved path
+char* config_dir(void);
 
 // #endregion
 
