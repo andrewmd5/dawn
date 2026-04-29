@@ -171,6 +171,14 @@ make
 make install  # optional, installs to /usr/local/bin
 ```
 
+To install under a different prefix, pass `PREFIX` on the install
+invocation (the variable is consumed by `cmake --install`, not the
+build itself):
+
+```bash
+make PREFIX=/usr/local/dawn-0.1.3 install
+```
+
 **Requirements:**
 - CMake 3.16+
 - C compiler with C23 support (Clang 16+, GCC 13+)
