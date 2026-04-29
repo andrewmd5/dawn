@@ -330,6 +330,16 @@ static inline void check_auto_list_space(int32_t key)
         if (p + 1 == app.cursor && gap_at(&app.text, p) == (char)key) {
             gap_insert(&app.text, app.cursor++, ' ');
         }
+        // For '-', if user typed '--' but auto-space got in the way, undo it
+        // Pattern: "- -" where cursor is after second dash
+        else if (key == '-' &&
+                 p + 3 == app.cursor &&
+                 gap_at(&app.text, p) == '-' &&
+                 gap_at(&app.text, p + 1) == ' ' &&
+                 gap_at(&app.text, p + 2) == '-') {
+            gap_delete(&app.text, p + 1);
+            app.cursor--;
+        }
     } else {
         // Ordered list: digits followed by . or )
         // Check if we have digits then the marker we just typed
