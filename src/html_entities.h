@@ -192,7 +192,7 @@ static const HtmlEntity entity_table[] = {
     { "icy", "\xd0\xb8" },
     { "iff", "\xe2\x87\x94" },
     { "ifr", "\xf0\x9d\x94\xa6" },
-    { "int32_t", "\xe2\x88\xab" },
+    { "int", "\xe2\x88\xab" },
     { "jcy", "\xd0\xb9" },
     { "jfr", "\xf0\x9d\x94\xa7" },
     { "kcy", "\xd0\xba" },

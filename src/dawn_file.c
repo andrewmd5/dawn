@@ -21,15 +21,68 @@
 
 // #region History Directory
 
+#ifdef _WIN32
+#define DAWN_PATH_SEP "\\"
+#else
+#define DAWN_PATH_SEP "/"
+#endif
+
+//! Build a legacy ~/.dawn path (the pre-XDG default).
+static void build_legacy_dir(char* out, size_t out_size)
+{
+    const char* home = DAWN_BACKEND(app)->home_dir();
+    DAWN_ASSERT(home, "home_dir() returned NULL");
+    snprintf(out, out_size, "%s" DAWN_PATH_SEP "%s", home, HISTORY_DIR_NAME);
+}
+
 char* history_dir(void)
 {
     static char path[PATH_MAX];
-    const char* home = DAWN_BACKEND(app)->home_dir();
-    DAWN_ASSERT(home, "home_dir() returned NULL");
+
 #ifdef _WIN32
-    snprintf(path, sizeof(path), "%s\\%s", home, HISTORY_DIR_NAME);
+    build_legacy_dir(path, sizeof(path));
+    return path;
 #else
-    snprintf(path, sizeof(path), "%s/%s", home, HISTORY_DIR_NAME);
+    // Legacy path takes precedence so existing users keep their data.
+    static char legacy[PATH_MAX];
+    build_legacy_dir(legacy, sizeof(legacy));
+    if (DAWN_BACKEND(app)->file_exists(legacy)) {
+        memcpy(path, legacy, sizeof(path));
+        return path;
+    }
+
+    const char* xdg_data = getenv("XDG_DATA_HOME");
+    if (xdg_data && xdg_data[0] == '/') {
+        snprintf(path, sizeof(path), "%s/%s", xdg_data, APP_NAME);
+    } else {
+        const char* home = DAWN_BACKEND(app)->home_dir();
+        DAWN_ASSERT(home, "home_dir() returned NULL");
+        snprintf(path, sizeof(path), "%s/.local/share/%s", home, APP_NAME);
+    }
+    return path;
+#endif
+}
+
+char* config_dir(void)
+{
+    static char path[PATH_MAX];
+
+#ifdef _WIN32
+    const char* appdata = getenv("APPDATA");
+    if (appdata && appdata[0]) {
+        snprintf(path, sizeof(path), "%s\\%s", appdata, APP_NAME);
+    } else {
+        build_legacy_dir(path, sizeof(path));
+    }
+#else
+    const char* xdg_config = getenv("XDG_CONFIG_HOME");
+    if (xdg_config && xdg_config[0] == '/') {
+        snprintf(path, sizeof(path), "%s/%s", xdg_config, APP_NAME);
+    } else {
+        const char* home = DAWN_BACKEND(app)->home_dir();
+        DAWN_ASSERT(home, "home_dir() returned NULL");
+        snprintf(path, sizeof(path), "%s/.config/%s", home, APP_NAME);
+    }
 #endif
     return path;
 }

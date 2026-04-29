@@ -18,11 +18,12 @@
 // POSIX options: single-character only
 // -d FILE   Demo mode
 // -t THEME  Set theme (light/dark)
+// -T MINS   Set timer minutes (0 disables)
 // -p FILE   Preview file (read-only)
 // -P        Print mode (render to stdout)
 // -h        Help
 // -v        Version
-static const char* short_opts = "d:t:p:Phv";
+static const char* short_opts = "d:t:T:p:Phv";
 
 // #endregion
 
@@ -90,6 +91,7 @@ DawnArgs args_parse(int32_t argc, char* argv[])
 {
     DawnArgs args = { 0 };
     args.theme = -1; // Not set
+    args.timer_mins = -1; // Not set
 
     // Reset getopt
     optind = 1;
@@ -110,6 +112,18 @@ DawnArgs args_parse(int32_t argc, char* argv[])
                 args.error_msg = "Invalid theme (use 'light' or 'dark')";
             }
             break;
+
+        case 'T': {
+            char* end = NULL;
+            long mins = strtol(optarg, &end, 10);
+            if (!end || *end != '\0' || mins < 0 || mins > 24 * 60) {
+                args.flags |= ARG_ERROR;
+                args.error_msg = "Invalid timer (use minutes, e.g. -T 0 to disable)";
+            } else {
+                args.timer_mins = (int32_t)mins;
+            }
+            break;
+        }
 
         case 'p':
             args.flags |= ARG_PREVIEW;
@@ -222,6 +236,7 @@ void args_print_usage(const char* program_name)
         "  -P          Print rendered output to stdout and exit\n"
         "  -d file     Demo mode: replay file as if being typed\n"
         "  -t theme    Set theme: 'light' or 'dark'\n"
+        "  -T mins     Set timer in minutes (0 to disable)\n"
         "  -h          Show this help message\n"
         "  -v          Show version information\n"
         "\n"

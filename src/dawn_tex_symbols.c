@@ -294,7 +294,7 @@ static const TexSymbol TEX_SYMBOLS[] = {
 
     // Large operators (single-char forms)
     { "sum", "∑" }, { "prod", "∏" }, { "coprod", "∐" },
-    { "int32_t", "∫" }, { "oint", "∮" }, { "smallint", "∫" },
+    { "int", "∫" }, { "oint", "∮" }, { "smallint", "∫" },
 
     // Dots
     { "cdots", "⋯" }, { "dots", "…" }, { "ldots", "…" },
@@ -350,7 +350,7 @@ typedef struct {
 static const TexMultilineOp TEX_MULTILINE_OPS[] = {
     { "sum", "┰─╴▐╸ ┸─╴", 3, 3, 1 },
     { "prod", "┰─┰┃ ┃┸ ┸", 3, 3, 1 },
-    { "int32_t", "⌠│⌡", 3, 1, 1 },
+    { "int", "⌠│⌡", 3, 1, 1 },
     { "iint", "⌠⌠││⌡⌡", 3, 2, 1 },
     { "iiint", "⌠⌠⌠│││⌡⌡⌡", 3, 3, 1 },
     { "idotsint", "⌠ ⌠│⋯│⌡ ⌡", 3, 3, 1 },
@@ -680,7 +680,7 @@ static const TexCmdType CMD_TYPES[] = {
     { "sum", TEX_NT_CTR_BASE },
     { "prod", TEX_NT_CTR_BASE },
     { "coprod", TEX_NT_CTR_BASE },
-    { "int32_t", TEX_NT_CTR_BASE },
+    { "int", TEX_NT_CTR_BASE },
     { "iint", TEX_NT_CTR_BASE },
     { "iiint", TEX_NT_CTR_BASE },
     { "oint", TEX_NT_CTR_BASE },
