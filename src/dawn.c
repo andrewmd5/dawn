@@ -337,7 +337,7 @@ static inline void check_auto_list_space(int32_t key)
                  gap_at(&app.text, p) == '-' &&
                  gap_at(&app.text, p + 1) == ' ' &&
                  gap_at(&app.text, p + 2) == '-') {
-            gap_delete(&app.text, p + 1);
+            gap_delete(&app.text, p + 1, 1);
             app.cursor--;
         }
     } else {
