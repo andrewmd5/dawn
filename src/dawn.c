@@ -3635,15 +3635,25 @@ static void handle_writing(int32_t key)
         break;
     }
 
-    // Mouse scroll: scroll view without moving cursor
+    // Mouse scroll: NOTE: Changed to move cursor WITH the mouse scroll
     case DAWN_KEY_MOUSE_SCROLL_UP: {
         app.scroll_y -= 3;
         if (app.scroll_y < 0)
             app.scroll_y = 0;
+	for (int i =0; i < 3; i++) {
+		size_t new_pos = nav_move_visual_line_block_aware(app.cursor, -1, get_text_width(), app.hide_cursor_syntax);
+		if (new_pos == app.cursor) break;
+		app.cursor = new_pos;
+	}
         break;
     }
     case DAWN_KEY_MOUSE_SCROLL_DOWN: {
         app.scroll_y += 3;
+	for (int i =0; i < 3; i++) {
+		size_t new_pos = nav_move_visual_line_block_aware(app.cursor, 1, get_text_width(), app.hide_cursor_syntax);
+		if (new_pos == app.cursor) break;
+		app.cursor = new_pos;
+	}
         // Will be clamped during render
         break;
     }
