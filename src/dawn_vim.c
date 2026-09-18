@@ -1,7 +1,4 @@
-// dawn_vim.c - Neovim-style modal editing (motions + modes)
-//
-// Commit 2: navigation, mode switching, visual selection, command-line stub.
-// Operators (d/y/c), registers and repeat arrive in the next commit.
+// dawn_vim.c - Neovim-style modal editing (motions, operators, registers)
 
 #include "dawn_vim.h"
 #include "dawn_app.h"
@@ -1024,9 +1021,11 @@ static void vim_exec_operator(size_t target, bool motion_linewise, int32_t motio
         linewise = true;
 
     // Normalize charwise range (exclusive vs inclusive)
+    // Exclusive motions (w/b/0/^/$/h/j/k/G/{/}/t) already end one-past;
+    // inclusive ones (e/E/f/F/%/;) rest ON the last char and need +1.
     size_t s = cur < target ? cur : target;
     size_t e = cur < target ? target : cur;
-    bool inclusive = (motion_key == 'e' || motion_key == 'E' || motion_key == '$' || motion_key == '%' || motion_key == 'l' || motion_key == ' ');
+    bool inclusive = (motion_key == 'e' || motion_key == 'E' || motion_key == '%' || motion_key == 'f' || motion_key == 'F' || motion_key == ';' || motion_key == ',');
     if (!linewise && e > s && inclusive && e < gap_len(&app.text))
         e = gap_utf8_next(&app.text, e);
 
@@ -1290,6 +1289,76 @@ static void vim_repeat_last(void)
         pending_gcase = saved_gcase;
         vim_clear_pending();
         pending_obj = 0;
+        return;
+    }
+    // Special motions that vim_motion_target() cannot recompute
+    if (rep_motion == 'd' || rep_motion == 'c' || rep_motion == '>' || rep_motion == '<') {
+        if (rep_linewise) {
+            // Doubled linewise op (dd/cc/>>/<<): apply to rep_count lines here
+            size_t cur = app.cursor;
+            for (int32_t i = 1; i < rep_count; i++)
+                cur = nav_move_line(cur, 1);
+            size_t s = nav_line_start(app.cursor), e = nav_line_end(cur);
+            if (rep_op == VIM_OP_DELETE)
+                vim_delete_lines(s, e);
+            else if (rep_op == VIM_OP_CHANGE) {
+                size_t len = gap_len(&app.text);
+                size_t le = e < len ? e + 1 : e;
+                vim_save_undo();
+                vim_store_yank(s, le, true);
+                gap_delete(&app.text, s, le - s);
+                app.cursor = s;
+                gap_insert_str(&app.text, app.cursor, rep_ins, rep_ins_len);
+                app.cursor += rep_ins_len;
+                vim_clamp_cursor();
+            } else if (rep_op == VIM_OP_INDENT_RIGHT || rep_op == VIM_OP_INDENT_LEFT) {
+                vim_indent_lines(s, e, rep_op == VIM_OP_INDENT_RIGHT ? 1 : -1, rep_count);
+            } else if (rep_op == VIM_OP_YANK) {
+                size_t len = gap_len(&app.text);
+                size_t le = e < len ? e + 1 : e;
+                vim_store_yank(s, le, true);
+            }
+            return;
+        }
+    }
+    if (rep_motion == 'D') {
+        size_t le = nav_line_end(app.cursor);
+        if (le > app.cursor)
+            vim_delete_range(app.cursor, le);
+        return;
+    }
+    if (rep_motion == 's' || rep_motion == 'S' || rep_motion == 'C') {
+        // Re-delete same shape then re-insert recorded text
+        if (rep_motion == 'S') {
+            size_t cur = app.cursor;
+            for (int32_t i = 1; i < rep_count; i++)
+                cur = nav_move_line(cur, 1);
+            vim_delete_lines(nav_line_start(app.cursor), nav_line_end(cur));
+            app.vim.mode = VIM_INSERT;
+            app.selecting = false;
+        } else if (rep_motion == 'C') {
+            size_t le = nav_line_end(app.cursor);
+            if (le > app.cursor)
+                vim_delete_range(app.cursor, le);
+            app.vim.mode = VIM_INSERT;
+            app.selecting = false;
+        } else {
+            size_t e = app.cursor;
+            size_t len = gap_len(&app.text);
+            for (int32_t i = 0; i < rep_count && e < len; i++) {
+                if (gap_at(&app.text, e) == '\n')
+                    break;
+                e = gap_utf8_next(&app.text, e);
+            }
+            if (e > app.cursor)
+                vim_delete_range(app.cursor, e);
+            app.vim.mode = VIM_INSERT;
+            app.selecting = false;
+        }
+        vim_clear_pending();
+        gap_insert_str(&app.text, app.cursor, rep_ins, rep_ins_len);
+        app.cursor += rep_ins_len;
+        vim_clamp_cursor();
         return;
     }
     bool lw = false;
@@ -1846,8 +1915,8 @@ static bool vim_handle_normal_key(int32_t key)
         return true;
     }
     case 'A':
-        vim_move(nav_line_end(app.cursor));
-        // In insert mode cursor may be past last char (append at EOL)
+        // Append at EOL: insert mode allows resting past the last char
+        app.cursor = nav_line_end(app.cursor);
         app.vim.mode = VIM_INSERT;
         app.selecting = false;
         vim_clear_pending();

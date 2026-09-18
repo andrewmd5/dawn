@@ -243,6 +243,24 @@ cat document.md | dawn -P
 | `Ctrl+H` | Show all shortcuts |
 | `Esc` | Close panel/modal |
 
+### Vim modal editing (opt-in)
+
+Press `v` in the main menu to toggle vim mode (persisted in settings).
+When enabled, the editor starts in **normal** mode:
+
+| Key | Action |
+|:----|:-------|
+| `i` `a` `I` `A` `o` `O` `Esc` | Enter insert / return to normal |
+| `h` `j` `k` `l` `w` `W` `b` `B` `e` `E` | Motions (counts work: `3w`, `2dw`) |
+| `0` `^` `$` `gg` `G` `{` `}` `%` `f`/`t` `;` `,` | Line/paragraph/bracket/find motions |
+| `d` `y` `c` `>` `<` `gu` `gU` + motion | Operators, with `iw`/`ap`/`i"`-style text objects |
+| `dd` `yy` `cc` `D` `C` `Y` `s` `S` `r` `x` `J` `~` | Line/char edits, join, case toggle |
+| `v` `V` | Visual / line selection (`y` `d` `c` `p` `o`) |
+| `"a` `p` `P` | Registers a-z, put after/before |
+| `.` `@:` | Repeat last change / last `: command` |
+| `:w` `:q` `:wq` `:q!` `:x` `:noh` | Save, menu, quit, clear search |
+| `/` `n` `N` | Search prompt, next/previous match |
+
 ---
 
 ## File Format

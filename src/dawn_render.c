@@ -287,7 +287,7 @@ void render_style_select(void)
 void render_help(void)
 {
     int32_t width = 44;
-    int32_t height = 26;
+    int32_t height = app.vim.enabled ? 33 : 26;
     int32_t top, left;
     render_popup_box(width, height, &top, &left);
 
@@ -391,6 +391,34 @@ void render_help(void)
     move_to(cy++, col2);
     platform_write_str("AI chat");
 #endif
+
+    if (app.vim.enabled) {
+        cy++;
+        move_to(cy++, col1);
+        set_fg(get_accent());
+        platform_set_bold(true);
+        platform_write_str("VIM");
+        platform_reset_attrs();
+        set_bg(get_modal_bg());
+        set_fg(get_dim());
+
+        move_to(cy, col1);
+        platform_write_str("i/a/o Esc");
+        move_to(cy++, col2);
+        platform_write_str("insert/normal");
+        move_to(cy, col1);
+        platform_write_str("d/y/c motion");
+        move_to(cy++, col2);
+        platform_write_str("delete/yank/chg");
+        move_to(cy, col1);
+        platform_write_str("v/V x p . :");
+        move_to(cy++, col2);
+        platform_write_str("visual/del/put/cmd");
+        move_to(cy, col1);
+        platform_write_str(":w :q :q!");
+        move_to(cy++, col2);
+        platform_write_str("save/menu/quit");
+    }
 
     // Footer
     move_to(top + height - 2, left + (width - 22) / 2);
