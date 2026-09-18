@@ -96,6 +96,21 @@ DawnColor get_code_bg(void);
 //! Get current theme's modal popup background color
 DawnColor get_modal_bg(void);
 
+//! Get the color used for a Markdown heading level (1-6).
+DawnColor get_heading(int32_t level);
+
+// Return the user-facing name of a theme.
+const char* theme_name(Theme theme);
+
+// Return true when a theme uses a dark palette.
+bool theme_is_dark(Theme theme);
+
+// Return the next theme in the cycle.
+Theme theme_next(Theme theme);
+
+// Parse a theme name; returns THEME_COUNT when invalid.
+Theme theme_from_name(const char* name);
+
 // #endregion
 
 // #region DawnColor Utilities

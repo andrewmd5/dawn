@@ -7,6 +7,7 @@
 #include "dawn_args.h"
 #include "dawn_compat.h"
 #include "dawn_utils.h"
+#include "dawn_theme.h"
 #include "dawn_types.h"
 
 #include <stdio.h>
@@ -17,7 +18,7 @@
 
 // POSIX options: single-character only
 // -d FILE   Demo mode
-// -t THEME  Set theme (light/dark)
+// -t THEME  Set theme
 // -T MINS   Set timer minutes (0 disables)
 // -p FILE   Preview file (read-only)
 // -P        Print mode (render to stdout)
@@ -70,17 +71,14 @@ static char* resolve_path(const char* path)
 }
 
 //! Parse theme argument
-//! @param arg theme string ("light" or "dark")
-//! @return 0 for light, 1 for dark, -1 for invalid
+//! @param arg theme string
+//! @return Theme enum value, or -1 for invalid
 static int32_t parse_theme(const char* arg)
 {
     if (!arg)
         return -1;
-    if (strcasecmp(arg, "light") == 0 || strcmp(arg, "0") == 0)
-        return 0;
-    if (strcasecmp(arg, "dark") == 0 || strcmp(arg, "1") == 0)
-        return 1;
-    return -1;
+    Theme theme = theme_from_name(arg);
+    return theme < THEME_COUNT ? (int32_t)theme : -1;
 }
 
 // #endregion
@@ -109,7 +107,7 @@ DawnArgs args_parse(int32_t argc, char* argv[])
             args.theme = parse_theme(optarg);
             if (args.theme < 0) {
                 args.flags |= ARG_ERROR;
-                args.error_msg = "Invalid theme (use 'light' or 'dark')";
+                args.error_msg = "Invalid theme (use -h to see available themes)";
             }
             break;
 
@@ -235,7 +233,7 @@ void args_print_usage(const char* program_name)
         "  -p file     Preview file in read-only mode\n"
         "  -P          Print rendered output to stdout and exit\n"
         "  -d file     Demo mode: replay file as if being typed\n"
-        "  -t theme    Set theme: 'light' or 'dark'\n"
+        "  -t theme    Set theme: ayu-light, catppuccin-latte, ice, light, lilac, one-light, paper, sakura, sepia, solarized-light, amber, ayu-dark, azure, catppuccin-mocha, chocolate, coffee, cyan, cyberpunk, dark, dracula, emerald, forest, fuchsia, gruvbox, halloween, high-contrast, lime, midnight, mint, monokai, nord, ocean, one-dark, orange, purple, red, rose, solarized-dark, synthwave, teal, terminal-green, tokyo-night, violet\n"
         "  -T mins     Set timer in minutes (0 to disable)\n"
         "  -h          Show this help message\n"
         "  -v          Show version information\n"
