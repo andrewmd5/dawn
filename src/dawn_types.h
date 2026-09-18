@@ -135,6 +135,61 @@ DAWN_ENUM(uint8_t) {
     STYLE_ELEGANT //!< Italic, refined
 } WritingStyle;
 
+//! Vim modal editing mode
+DAWN_ENUM(uint8_t) {
+    VIM_INSERT, //!< Insert mode (default editing behavior)
+    VIM_NORMAL, //!< Normal mode (motions + operators)
+    VIM_VISUAL, //!< Visual mode (char-wise selection)
+    VIM_VISUAL_LINE, //!< Visual line mode (line-wise selection)
+    VIM_COMMAND, //!< Command-line mode (: commands)
+} VimMode;
+
+//! Pending vim operator (awaits a motion)
+DAWN_ENUM(uint8_t) {
+    VIM_OP_NONE,
+    VIM_OP_DELETE, //!< d
+    VIM_OP_YANK, //!< y
+    VIM_OP_CHANGE, //!< c
+    VIM_OP_INDENT_RIGHT, //!< >
+    VIM_OP_INDENT_LEFT, //!< <
+    VIM_OP_TOGGLE_CASE, //!< g~ (stored via pending_g)
+} VimOperator;
+
+#define VIM_CMDLINE_MAX 128
+#define VIM_STATUS_MAX 128
+
+//! Vim modal editing state
+typedef struct {
+    bool enabled; //!< Master toggle (persisted in settings.json)
+    VimMode mode; //!< Current modal state
+    VimOperator pending_op; //!< Operator awaiting motion (d/y/c/>/</g)
+    bool pending_g; //!< 'g' prefix seen (gg, g~, gu, gU, gj, gk)
+    int32_t count; //!< Numeric prefix (0 = none)
+    int32_t count_op; //!< Count given before operator (for d2w vs 2dw semantics)
+    char last_find; //!< Last f/t character for ; , repeat
+    bool last_find_t; //!< true if last find was t/T (till)
+    bool last_find_back; //!< true if last find was F/T (backward)
+    char yank_reg; //!< Active register for next yank/put (" / a-z)
+    char regs[26][4096]; //!< Named registers a-z (text)
+    size_t reg_lens[26]; //!< Lengths of named registers
+    char yank_buf[8192]; //!< Unnamed yank buffer
+    size_t yank_len; //!< Yank buffer length
+    bool yank_linewise; //!< Last yank was linewise (for p/P placement)
+    char cmdline[VIM_CMDLINE_MAX]; //!< Command-line buffer (:... / /...)
+    size_t cmdline_len; //!< Command-line length
+    bool cmd_search; //!< true when cmdline is a / search (vs : command)
+    char status[VIM_STATUS_MAX]; //!< Transient status/error message
+    char last_cmd[VIM_CMDLINE_MAX]; //!< Last : command for @: repeat
+    size_t last_cmd_len; //!< Length of last : command
+    // Dot-repeat: record insert-mode bytes + normal keystrokes
+    char repeat_keys[512]; //!< Keys to replay on .
+    size_t repeat_len; //!< Length of repeat buffer
+    bool recording; //!< Currently recording a repeatable change
+    char find_char; //!< Pending f/t/F/T target acquisition
+    char find_op; //!< Which find op is pending (f/t/F/T), 0 = none
+    bool find_after_op; //!< Find is the motion for a pending operator
+} VimState;
+
 //! AI chat message
 typedef struct {
     char* text;
@@ -300,6 +355,9 @@ typedef struct {
     // Modal editors
     FmEditState fm_edit;
     BlockEditState block_edit;
+
+    // Vim modal editing (neovim-style)
+    VimState vim;
 
     // AI Chat
     bool ai_open; //!< AI panel visible

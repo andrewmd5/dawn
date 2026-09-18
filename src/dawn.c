@@ -3356,6 +3356,14 @@ static void new_session(void)
 
     app.cursor = 0;
     app.selecting = false;
+    app.vim.mode = app.vim.enabled ? VIM_NORMAL : VIM_INSERT;
+    app.vim.pending_op = VIM_OP_NONE;
+    app.vim.pending_g = false;
+    app.vim.count = 0;
+    app.vim.count_op = 0;
+    app.vim.cmdline_len = 0;
+    app.vim.status[0] = '\0';
+    app.vim.find_op = 0;
     app.timer_done = false;
     app.timer_on = (app.timer_mins > 0);
     if (app.timer_on) {
@@ -4085,6 +4093,12 @@ static void handle_input(void)
             app.theme = (app.theme == THEME_DARK) ? THEME_LIGHT : THEME_DARK;
             highlight_cleanup(app.hl_ctx);
             app.hl_ctx = highlight_init(app.theme == THEME_DARK);
+            settings_save();
+            break;
+        case 'v':
+        case 'V':
+            app.vim.enabled = !app.vim.enabled;
+            app.vim.mode = app.vim.enabled ? VIM_NORMAL : VIM_INSERT;
             settings_save();
             break;
         case '?':
@@ -4879,6 +4893,7 @@ bool dawn_engine_init(int8_t theme_override, int32_t timer_override)
     }
 
     gap_init(&app.text, 4096);
+    app.vim.mode = app.vim.enabled ? VIM_NORMAL : VIM_INSERT;
     hist_load();
 
     app.block_cache = malloc(sizeof(BlockCache));

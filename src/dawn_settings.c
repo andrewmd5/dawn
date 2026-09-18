@@ -66,6 +66,14 @@ void settings_load(void)
         apply_preset_for_minutes(mins);
     }
 
+    cJSON* vim_j = cJSON_GetObjectItem(root, "vim_mode");
+    if (cJSON_IsBool(vim_j)) {
+        app.vim.enabled = cJSON_IsTrue(vim_j);
+    } else if (cJSON_IsString(vim_j)) {
+        // Backwards compat: "vim_mode": "normal"/"insert"
+        app.vim.enabled = (strcmp(vim_j->valuestring, "normal") == 0 || strcmp(vim_j->valuestring, "on") == 0 || strcmp(vim_j->valuestring, "true") == 0);
+    }
+
     cJSON_Delete(root);
 }
 
@@ -77,6 +85,7 @@ void settings_save(void)
 
     cJSON_AddStringToObject(root, "theme", app.theme == THEME_DARK ? "dark" : "light");
     cJSON_AddNumberToObject(root, "timer_mins", (double)app.timer_mins);
+    cJSON_AddBoolToObject(root, "vim_mode", app.vim.enabled);
 
     char* json = cJSON_Print(root);
     cJSON_Delete(root);

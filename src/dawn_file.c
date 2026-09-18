@@ -264,6 +264,14 @@ static void load_content(char* content, size_t size, const char* path)
     app.cursor = 0;
     app.scroll_y = 0;
     app.selecting = false;
+    app.vim.mode = app.vim.enabled ? VIM_NORMAL : VIM_INSERT;
+    app.vim.pending_op = VIM_OP_NONE;
+    app.vim.pending_g = false;
+    app.vim.count = 0;
+    app.vim.count_op = 0;
+    app.vim.cmdline_len = 0;
+    app.vim.status[0] = '\0';
+    app.vim.find_op = 0;
     app.timer_done = false;
     app.timer_on = false;
     app.mode = MODE_WRITING;
