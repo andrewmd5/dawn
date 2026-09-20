@@ -758,6 +758,11 @@ static void win32_set_cursor_visible(bool visible)
     buf_append_str(visible ? CURSOR_SHOW : CURSOR_HIDE);
 }
 
+static void win32_set_cursor_shape(DawnCursorShape shape)
+{
+    buf_append_str(shape == DAWN_CURSOR_BEAM ? CURSOR_BEAM : CURSOR_BLOCK);
+}
+
 static void win32_set_fg(DawnColor color)
 {
     buf_fg(color.r, color.g, color.b);
@@ -2405,6 +2410,7 @@ const DawnBackend dawn_backend_win32 = {
     .get_size = win32_get_size,
     .set_cursor = win32_set_cursor,
     .set_cursor_visible = win32_set_cursor_visible,
+    .set_cursor_shape = win32_set_cursor_shape,
     .set_fg = win32_set_fg,
     .set_bg = win32_set_bg,
     .reset_attrs = win32_reset_attrs,

@@ -3354,6 +3354,17 @@ static void render(void)
         break;
     }
 
+    // Beam cursor in insert mode, block everywhere else (interactive only,
+    // so print/piped output never gets cursor-shape escapes).
+    if (app.ctx.mode == DAWN_MODE_INTERACTIVE) {
+        DawnCursorShape want = (app.vim.mode == VIM_INSERT) ? DAWN_CURSOR_BEAM : DAWN_CURSOR_BLOCK;
+        static DawnCursorShape applied = (DawnCursorShape)-1;
+        if (want != applied) {
+            cursor_shape(want);
+            applied = want;
+        }
+    }
+
     sync_end();
     out_flush();
 }
@@ -4962,6 +4973,12 @@ bool dawn_engine_init(int8_t theme_override, int32_t timer_override)
 void dawn_engine_shutdown(void)
 {
     DAWN_BACKEND(app)->set_title(NULL);
+
+    // Leave the terminal with a standard block cursor.
+    if (app.ctx.mode == DAWN_MODE_INTERACTIVE) {
+        cursor_shape(DAWN_CURSOR_BLOCK);
+        out_flush();
+    }
 
     if (gap_len(&app.text) > 0 && app.mode == MODE_WRITING && !app.preview_mode)
         save_session();
