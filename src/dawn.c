@@ -4079,6 +4079,7 @@ static void handle_input(void)
             break;
         case 'h':
             load_history();
+            app.hist_confirm = false;
             app.mode = MODE_HISTORY;
             break;
         case 'd':
@@ -4142,6 +4143,28 @@ static void handle_input(void)
         break;
 
     case MODE_HISTORY:
+        if (app.hist_confirm) {
+            switch (key) {
+            case 'y':
+            case 'Y':
+            case 'd':
+                if (app.hist_confirm_idx >= 0 && app.hist_confirm_idx < app.hist_count) {
+                    char* path = dawn_strdup(app.history[app.hist_confirm_idx].path);
+                    hist_remove(path);
+                    free(path);
+                    if (app.hist_sel >= app.hist_count && app.hist_sel > 0)
+                        app.hist_sel--;
+                }
+                app.hist_confirm = false;
+                break;
+            case 'n':
+            case 'N':
+            case '\x1b':
+                app.hist_confirm = false;
+                break;
+            }
+            break;
+        }
         switch (key) {
         case '\x1b':
             app.mode = MODE_WELCOME;
@@ -4180,11 +4203,8 @@ static void handle_input(void)
             break;
         case 'd':
             if (app.hist_count > 0) {
-                char* path = dawn_strdup(app.history[app.hist_sel].path);
-                hist_remove(path);
-                free(path);
-                if (app.hist_sel >= app.hist_count && app.hist_sel > 0)
-                    app.hist_sel--;
+                app.hist_confirm = true;
+                app.hist_confirm_idx = app.hist_sel;
             }
             break;
         }

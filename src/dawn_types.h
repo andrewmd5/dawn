@@ -292,6 +292,8 @@ typedef struct {
     HistoryEntry* history; //!< Document history array
     int32_t hist_count; //!< Number of history entries
     int32_t hist_sel; //!< Selected history index
+    bool hist_confirm; //!< Delete confirmation pending
+    int32_t hist_confirm_idx; //!< History index awaiting delete confirmation
 
     // Current Session
     char* session_path; //!< Path to current document
