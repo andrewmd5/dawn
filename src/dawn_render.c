@@ -394,9 +394,55 @@ void render_history(void)
 {
     render_clear();
 
+    if (app.hist_show_deleted) {
+        if (app.hist_deleted_count == 0) {
+            render_center_text(app.rows / 2, "nothing to restore", get_dim());
+            render_center_text(app.rows / 2 + 2, "[r]/[esc] back", get_dim());
+            return;
+        }
+
+        move_to(2, 4);
+        set_fg(get_fg());
+        platform_write_str("deleted notes");
+
+        int32_t visible = app.rows - 6;
+        int32_t start = 0;
+        if (app.hist_deleted_sel >= visible)
+            start = app.hist_deleted_sel - visible + 1;
+
+        for (int32_t i = 0; i < visible && start + i < app.hist_deleted_count; i++) {
+            int32_t idx = start + i;
+            HistoryEntry* entry = &app.hist_deleted[idx];
+
+            move_to(4 + i, 4);
+            if (idx == app.hist_deleted_sel) {
+                set_fg(get_accent());
+                platform_write_str("> ");
+            } else {
+                set_fg(get_dim());
+                platform_write_str("  ");
+            }
+
+            const char* title = entry->title ? entry->title : "Untitled";
+            char title_buf[64];
+            snprintf(title_buf, sizeof(title_buf), "%-30.30s  ", title);
+            platform_write_str(title_buf);
+            set_fg(get_dim());
+            platform_write_str(entry->date_str);
+        }
+
+        move_to(app.rows - 1, 4);
+        set_fg(get_dim());
+        platform_write_str("[j/k] select   [o] restore   [r] back   [esc] back");
+        return;
+    }
+
     if (app.hist_count == 0) {
         render_center_text(app.rows / 2, "no history yet", get_dim());
-        render_center_text(app.rows / 2 + 2, "[esc] back", get_dim());
+        if (app.hist_deleted_count > 0)
+            render_center_text(app.rows / 2 + 2, "[r] restore deleted   [esc] back", get_dim());
+        else
+            render_center_text(app.rows / 2 + 2, "[esc] back", get_dim());
         return;
     }
 
@@ -433,7 +479,7 @@ void render_history(void)
 
     move_to(app.rows - 1, 4);
     set_fg(get_dim());
-    platform_write_str("[j/k] select   [o] open   [t] title   [d] delete   [e] finder   [esc] back");
+    platform_write_str("[j/k] select   [o] open   [t] title   [d] delete   [r] restore   [e] finder   [esc] back");
 
     if (app.hist_confirm && app.hist_confirm_idx >= 0 && app.hist_confirm_idx < app.hist_count) {
         HistoryEntry* entry = &app.history[app.hist_confirm_idx];

@@ -50,6 +50,20 @@ bool hist_upsert(const char* path, const char* title, size_t cursor);
 //! @return true if entry was found and removed
 bool hist_remove(const char* path);
 
+//! Restore a deleted entry back into history
+//! The .md file is kept on disk by hist_remove, so this re-adds it.
+//! @param path Full path to restore
+//! @return true on success
+bool hist_restore(const char* path);
+
+//! Refresh the list of restorable notes
+//! Populates app.hist_deleted with entries removed from history
+//! whose .md file still exists on disk (plus orphan .md files).
+void hist_refresh_deleted(void);
+
+//! Free the restorable notes list
+void hist_free_deleted(void);
+
 //! Find entry by path
 //! @param path Full path to find
 //! @return Pointer to entry, or NULL if not found

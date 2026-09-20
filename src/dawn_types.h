@@ -294,6 +294,10 @@ typedef struct {
     int32_t hist_sel; //!< Selected history index
     bool hist_confirm; //!< Delete confirmation pending
     int32_t hist_confirm_idx; //!< History index awaiting delete confirmation
+    HistoryEntry* hist_deleted; //!< Restorable notes (removed from history, file kept)
+    int32_t hist_deleted_count; //!< Number of restorable notes
+    int32_t hist_deleted_sel; //!< Selected restorable note index
+    bool hist_show_deleted; //!< Showing restorable notes instead of history
 
     // Current Session
     char* session_path; //!< Path to current document
