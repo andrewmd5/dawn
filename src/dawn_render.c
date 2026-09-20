@@ -194,18 +194,18 @@ void render_welcome(void)
     render_text_at(row, col2 + 2, " theme", get_dim());
 
     row += 2;
-    render_text_at(row, col1, "q", get_accent());
-    render_text_at(row, col1 + 6, " quit", get_dim());
-    render_text_at(row, col2, "?", get_accent());
-    render_text_at(row, col2 + 2, " help", get_dim());
-
-    row += 2;
     render_text_at(row, col1, "v", get_accent());
     {
         char vim_label[32];
         snprintf(vim_label, sizeof(vim_label), " vim: %s", app.vim.enabled ? "on" : "off");
         render_text_at(row, col1 + 6, vim_label, get_dim());
     }
+    render_text_at(row, col2, "?", get_accent());
+    render_text_at(row, col2 + 2, " help", get_dim());
+
+    row += 2;
+    render_text_at(row, col1, "q", get_accent());
+    render_text_at(row, col1 + 6, " quit", get_dim());
 
 #if HAS_LIBAI
     if (app.ai_ready) {
