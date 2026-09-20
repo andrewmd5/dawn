@@ -258,7 +258,7 @@ void render_timer_select(void)
             (int32_t)i == app.preset_idx ? get_accent() : get_dim());
     }
 
-    render_center_text(app.rows - 2, "[j/k] select   [enter] confirm   [esc] back", get_dim());
+    render_center_text(app.rows - 2, "[j/k] select   [g/G] first/last   [enter] confirm   [esc] back", get_dim());
 }
 
 void render_style_select(void)
@@ -287,7 +287,7 @@ void render_style_select(void)
 void render_help(void)
 {
     int32_t width = 44;
-    int32_t height = app.vim.enabled ? 33 : 26;
+    int32_t height = app.vim.enabled ? 34 : 27;
     int32_t top, left;
     render_popup_box(width, height, &top, &left);
 
@@ -325,6 +325,10 @@ void render_help(void)
     platform_write_str("pgup/pgdn");
     move_to(cy++, col2);
     platform_write_str("scroll page");
+    move_to(cy, col1);
+    platform_write_str("j/k g/G");
+    move_to(cy++, col2);
+    platform_write_str("lists first/last");
     move_to(cy, col1);
     platform_write_str("^L");
     move_to(cy++, col2);
@@ -469,7 +473,7 @@ void render_history(void)
 
     move_to(app.rows - 1, 4);
     set_fg(get_dim());
-    platform_write_str("[j/k] select   [o] open   [t] title   [d] delete   [e] finder   [esc] back");
+    platform_write_str("[j/k] move   [g/G] ends   [o] open   [t] title   [d] del   [e] finder   [esc] back");
 }
 
 void render_finished(void)
@@ -890,7 +894,7 @@ void render_toc(void)
     // Footer
     move_to(top + height - 2, content_left);
     set_fg(get_dim());
-    platform_write_str("↑↓:nav  enter:jump  esc:close");
+    platform_write_str("j/k:nav  ^U/^D:page  home/end  enter:jump  esc:close");
 
     // Position cursor at filter
     move_to(filter_row, content_left + 8 + toc->filter_len);
@@ -1028,7 +1032,7 @@ void render_search(void)
     // Footer
     move_to(top + height - 2, content_left);
     set_fg(get_dim());
-    platform_write_str("↑↓:nav  enter:jump  ^n/^p:next/prev  esc:close");
+    platform_write_str("j/k:nav  ^U/^D:page  ^n/^p:next/prev  enter:jump  esc:close");
 
     // Position cursor at search
     move_to(search_row, content_left + 6 + search->query_len);

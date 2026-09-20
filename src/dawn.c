@@ -4178,6 +4178,18 @@ static void handle_input(void)
             app.timer_mins = TIMER_PRESETS[app.preset_idx];
             settings_save();
             break;
+        case 'g':
+        case DAWN_KEY_HOME:
+            app.preset_idx = 0;
+            app.timer_mins = TIMER_PRESETS[app.preset_idx];
+            settings_save();
+            break;
+        case 'G':
+        case DAWN_KEY_END:
+            app.preset_idx = (int32_t)NUM_PRESETS - 1;
+            app.timer_mins = TIMER_PRESETS[app.preset_idx];
+            settings_save();
+            break;
         case '\r':
         case '\n':
             app.mode = MODE_WELCOME;
@@ -4200,6 +4212,14 @@ static void handle_input(void)
             if (app.style < STYLE_ELEGANT)
                 app.style++;
             break;
+        case 'g':
+        case DAWN_KEY_HOME:
+            app.style = STYLE_MINIMAL;
+            break;
+        case 'G':
+        case DAWN_KEY_END:
+            app.style = STYLE_ELEGANT;
+            break;
         case '\r':
         case '\n':
             app.mode = MODE_WELCOME;
@@ -4221,6 +4241,29 @@ static void handle_input(void)
         case DAWN_KEY_DOWN:
             if (app.hist_sel < app.hist_count - 1)
                 app.hist_sel++;
+            break;
+        case 'g':
+        case DAWN_KEY_HOME:
+            app.hist_sel = 0;
+            break;
+        case 'G':
+        case DAWN_KEY_END:
+            if (app.hist_count > 0)
+                app.hist_sel = app.hist_count - 1;
+            break;
+        case DAWN_KEY_PGUP:
+        case 21: // Ctrl+U: half-page up
+            app.hist_sel -= 10;
+            if (app.hist_sel < 0)
+                app.hist_sel = 0;
+            break;
+        case DAWN_KEY_PGDN:
+        case 4: // Ctrl+D: half-page down
+            app.hist_sel += 10;
+            if (app.hist_sel >= app.hist_count)
+                app.hist_sel = app.hist_count - 1;
+            if (app.hist_sel < 0)
+                app.hist_sel = 0;
             break;
         case 'o':
         case '\r':
@@ -4813,14 +4856,24 @@ static void handle_input(void)
                 toc->selected++;
             break;
         case DAWN_KEY_PGUP:
+        case 21: // Ctrl+U: page up
             toc->selected -= 10;
             if (toc->selected < 0)
                 toc->selected = 0;
             break;
         case DAWN_KEY_PGDN:
+        case 4: // Ctrl+D: page down
             toc->selected += 10;
             if (toc->selected >= toc->filtered_count)
                 toc->selected = toc->filtered_count - 1;
+            if (toc->selected < 0)
+                toc->selected = 0;
+            break;
+        case DAWN_KEY_HOME:
+            toc->selected = 0;
+            break;
+        case DAWN_KEY_END:
+            toc->selected = toc->filtered_count - 1;
             if (toc->selected < 0)
                 toc->selected = 0;
             break;
@@ -4876,14 +4929,24 @@ static void handle_input(void)
                 search->selected++;
             break;
         case DAWN_KEY_PGUP:
+        case 21: // Ctrl+U: page up
             search->selected -= 10;
             if (search->selected < 0)
                 search->selected = 0;
             break;
         case DAWN_KEY_PGDN:
+        case 4: // Ctrl+D: page down
             search->selected += 10;
             if (search->selected >= search->count)
                 search->selected = search->count - 1;
+            if (search->selected < 0)
+                search->selected = 0;
+            break;
+        case DAWN_KEY_HOME:
+            search->selected = 0;
+            break;
+        case DAWN_KEY_END:
+            search->selected = search->count - 1;
             if (search->selected < 0)
                 search->selected = 0;
             break;

@@ -242,6 +242,8 @@ cat document.md | dawn -P
 | `Ctrl+Y` | Redo |
 | `Ctrl+H` | Show all shortcuts |
 | `Esc` | Close panel/modal |
+| `j`/`k` `g`/`G` | Move in lists, first/last item (history, menus, TOC, search) |
+| `Ctrl+U`/`Ctrl+D` | Page through history, TOC, search |
 
 ### Vim modal editing (opt-in)
 
