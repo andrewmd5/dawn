@@ -3354,10 +3354,11 @@ static void render(void)
         break;
     }
 
-    // Beam cursor in insert mode, block everywhere else (interactive only,
-    // so print/piped output never gets cursor-shape escapes).
+    // Beam cursor in vim insert mode, block everywhere else (interactive only,
+    // so print/piped output never gets cursor-shape escapes). With vim mode
+    // off the cursor stays block, as before.
     if (app.ctx.mode == DAWN_MODE_INTERACTIVE) {
-        DawnCursorShape want = (app.vim.mode == VIM_INSERT) ? DAWN_CURSOR_BEAM : DAWN_CURSOR_BLOCK;
+        DawnCursorShape want = (app.vim.enabled && app.vim.mode == VIM_INSERT) ? DAWN_CURSOR_BEAM : DAWN_CURSOR_BLOCK;
         static DawnCursorShape applied = (DawnCursorShape)-1;
         if (want != applied) {
             cursor_shape(want);
