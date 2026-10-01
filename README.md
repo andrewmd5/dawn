@@ -208,6 +208,24 @@ The executable will be at `build/Release/dawn.exe`.
 
 ---
 
+
+---
+
+## Input Method Support
+
+Dawn works with input method frameworks (fcitx5, IBus, etc.) through your terminal emulator.
+The terminal handles composition and preedit display; Dawn receives the finalized UTF-8 text.
+
+- **Works with:** fcitx5, IBus, uim, and any IME on both X11 and Wayland
+- **Terminal support:** All modern terminals (GNOME Terminal, Konsole, Alacritty, Kitty, WezTerm, foot, etc.)
+- **No Dawn-specific configuration needed** — if your IME works in `cat`, it works in Dawn
+- **Version requirement:** Dawn 0.11+ (fixes `DAWN_KEY_UP` to accept all Unicode codepoints)
+
+**Troubleshooting:** If Korean/CJK/emoji input does not appear, test with `cat` in the same terminal.
+If characters appear in `cat`, they will appear in Dawn.
+
+---
+
 ## Usage
 
 ```bash
