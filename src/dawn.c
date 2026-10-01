@@ -4079,6 +4079,10 @@ static void handle_input(void)
             break;
         case 'h':
             load_history();
+            hist_refresh_deleted();
+            app.hist_confirm = false;
+            app.hist_show_deleted = false;
+            app.hist_deleted_sel = 0;
             app.mode = MODE_HISTORY;
             break;
         case 'd':
@@ -4142,6 +4146,62 @@ static void handle_input(void)
         break;
 
     case MODE_HISTORY:
+        if (app.hist_confirm) {
+            switch (key) {
+            case 'y':
+            case 'Y':
+            case 'd':
+                if (app.hist_confirm_idx >= 0 && app.hist_confirm_idx < app.hist_count) {
+                    char* path = dawn_strdup(app.history[app.hist_confirm_idx].path);
+                    hist_remove(path);
+                    free(path);
+                    if (app.hist_sel >= app.hist_count && app.hist_sel > 0)
+                        app.hist_sel--;
+                    hist_refresh_deleted();
+                }
+                app.hist_confirm = false;
+                break;
+            case 'n':
+            case 'N':
+            case '\x1b':
+                app.hist_confirm = false;
+                break;
+            }
+            break;
+        }
+        if (app.hist_show_deleted) {
+            switch (key) {
+            case '\x1b':
+            case 'r':
+                app.hist_show_deleted = false;
+                break;
+            case 'k':
+            case DAWN_KEY_UP:
+                if (app.hist_deleted_sel > 0)
+                    app.hist_deleted_sel--;
+                break;
+            case 'j':
+            case DAWN_KEY_DOWN:
+                if (app.hist_deleted_sel < app.hist_deleted_count - 1)
+                    app.hist_deleted_sel++;
+                break;
+            case 'o':
+            case '\r':
+            case '\n':
+                if (app.hist_deleted_count > 0) {
+                    char* path = dawn_strdup(app.hist_deleted[app.hist_deleted_sel].path);
+                    hist_restore(path);
+                    free(path);
+                    if (app.hist_deleted_count == 0)
+                        app.hist_show_deleted = false;
+                    else if (app.hist_deleted_sel >= app.hist_deleted_count
+                        && app.hist_deleted_sel > 0)
+                        app.hist_deleted_sel--;
+                }
+                break;
+            }
+            break;
+        }
         switch (key) {
         case '\x1b':
             app.mode = MODE_WELCOME;
@@ -4180,12 +4240,14 @@ static void handle_input(void)
             break;
         case 'd':
             if (app.hist_count > 0) {
-                char* path = dawn_strdup(app.history[app.hist_sel].path);
-                hist_remove(path);
-                free(path);
-                if (app.hist_sel >= app.hist_count && app.hist_sel > 0)
-                    app.hist_sel--;
+                app.hist_confirm = true;
+                app.hist_confirm_idx = app.hist_sel;
             }
+            break;
+        case 'r':
+            hist_refresh_deleted();
+            app.hist_deleted_sel = 0;
+            app.hist_show_deleted = true;
             break;
         }
         break;
