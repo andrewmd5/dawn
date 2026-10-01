@@ -5,6 +5,7 @@
 #include "dawn_crdt.h"
 #include "dawn_date.h"
 #include "dawn_file.h"
+#include "dawn_fm.h"
 #include "dawn_types.h"
 #include "dawn_utils.h"
 #include <limits.h>
@@ -269,6 +270,9 @@ void hist_free(void)
 void hist_shutdown(void)
 {
     hist_free();
+    hist_free_deleted();
+    app.hist_show_deleted = false;
+    app.hist_confirm = false;
     if (hist_state) {
         crdt_free(hist_state);
         hist_state = NULL;
@@ -335,6 +339,223 @@ HistEntry* hist_find(const char* path)
     }
     free(norm_path);
     return NULL;
+}
+
+// #endregion
+
+// #region Restore
+
+//! Find a CRDT entry even if tombstoned (NULL if never seen)
+static CrdtEntry* find_entry_any(const char* norm_path)
+{
+    if (!hist_state || !norm_path)
+        return NULL;
+    for (int32_t i = 0; i < hist_state->entry_count; i++) {
+        if (strcmp(hist_state->entries[i].key, norm_path) == 0)
+            return &hist_state->entries[i];
+    }
+    return NULL;
+}
+
+//! Read the title from a session .md file's frontmatter
+//! @return Allocated title string or NULL (caller must free)
+static char* read_title_from_file(const char* path)
+{
+    size_t len = 0;
+    char* content = DAWN_BACKEND(app)->read_file(path, &len);
+    if (!content)
+        return NULL;
+
+    char* title = NULL;
+    size_t consumed = 0;
+    Frontmatter* fm = fm_parse(content, len, &consumed);
+    if (fm) {
+        const char* t = fm_get_string(fm, "title");
+        if (t)
+            title = dawn_strdup(t);
+        fm_free(fm);
+    }
+    free(content);
+    return title;
+}
+
+static bool deleted_contains(const char* norm_path)
+{
+    for (int32_t i = 0; i < app.hist_deleted_count; i++) {
+        if (strcmp(app.hist_deleted[i].path, norm_path) == 0)
+            return true;
+    }
+    return false;
+}
+
+static void push_deleted(const char* path, const char* title, int64_t timestamp_ms, size_t cursor)
+{
+    HistoryEntry* grown
+        = realloc(app.hist_deleted, sizeof(HistoryEntry) * (size_t)(app.hist_deleted_count + 1));
+    if (!grown)
+        return;
+    app.hist_deleted = grown;
+
+    HistoryEntry* entry = &app.hist_deleted[app.hist_deleted_count];
+    entry->path = dawn_strdup(path);
+    entry->title = title ? dawn_strdup(title) : NULL;
+
+    char date_buf[64];
+    format_date(timestamp_ms, date_buf, sizeof(date_buf));
+    entry->date_str = dawn_strdup(date_buf);
+    entry->cursor = cursor;
+
+    app.hist_deleted_count++;
+}
+
+bool hist_restore(const char* path)
+{
+    if (!path)
+        return false;
+
+    char* norm_path = normalize_path(path);
+    if (!DAWN_BACKEND(app)->file_exists(norm_path)) {
+        free(norm_path);
+        return false;
+    }
+
+    if (!hist_state)
+        hist_load();
+    if (!hist_state)
+        hist_state = crdt_create();
+
+    CrdtEntry* stored = find_entry_any(norm_path);
+    char* title = NULL;
+    size_t cursor = 0;
+    bool title_owned = false;
+
+    if (stored) {
+        if (stored->value)
+            title = stored->value;
+        int64_t cursor_val = 0;
+        if (stored->meta && crdt_meta_get_int(stored, "cursor", &cursor_val) && cursor_val > 0)
+            cursor = (size_t)cursor_val;
+    }
+    if (!title) {
+        title = read_title_from_file(norm_path);
+        title_owned = (title != NULL);
+    }
+
+    crdt_upsert(hist_state, norm_path, title);
+
+    CrdtEntry* revived = crdt_find(hist_state, norm_path);
+    if (revived && cursor > 0)
+        crdt_meta_set_int(revived, "cursor", (int64_t)cursor);
+
+    if (title_owned)
+        free(title);
+    free(norm_path);
+
+    hist_save();
+    hist_refresh_deleted();
+    return true;
+}
+
+void hist_refresh_deleted(void)
+{
+    hist_free_deleted();
+
+    if (!hist_state)
+        hist_load();
+
+    // Tombstoned entries whose .md file still exists
+    if (hist_state) {
+        for (int32_t i = 0; i < hist_state->tombstone_count; i++) {
+            const char* key = hist_state->tombstones[i].key;
+            if (!key)
+                continue;
+            if (crdt_find(hist_state, key))
+                continue; // resurrected, not deleted
+            if (!DAWN_BACKEND(app)->file_exists(key))
+                continue;
+
+            CrdtEntry* stored = find_entry_any(key);
+            const char* title = stored && stored->value ? stored->value : NULL;
+            char* file_title = NULL;
+            if (!title) {
+                file_title = read_title_from_file(key);
+                title = file_title;
+            }
+
+            int64_t ts = stored ? stored->timestamp : 0;
+            size_t cursor = 0;
+            if (stored) {
+                int64_t cursor_val = 0;
+                if (stored->meta && crdt_meta_get_int(stored, "cursor", &cursor_val)
+                    && cursor_val > 0)
+                    cursor = (size_t)cursor_val;
+            }
+            if (ts == 0) {
+                int64_t mtime = DAWN_BACKEND(app)->mtime(key);
+                if (mtime > 0)
+                    ts = mtime * 1000;
+            }
+
+            push_deleted(key, title, ts, cursor);
+            free(file_title);
+        }
+    }
+
+    // Orphan .md files in the history dir (never tracked or entry pruned)
+    char** names = NULL;
+    int32_t name_count = 0;
+    if (DAWN_BACKEND(app)->list_dir(history_dir(), &names, &name_count)) {
+        for (int32_t i = 0; i < name_count; i++) {
+            const char* name = names[i];
+            if (!name)
+                continue;
+            size_t nlen = strlen(name);
+            if (nlen <= 3 || strcmp(name + nlen - 3, ".md") != 0)
+                continue;
+
+            char full[PATH_MAX];
+            snprintf(full, sizeof(full), "%s/%s", history_dir(), name);
+            char* norm = normalize_path(full);
+
+            if (hist_find(norm) || deleted_contains(norm)) {
+                free(norm);
+                continue;
+            }
+            if (!DAWN_BACKEND(app)->file_exists(norm)) {
+                free(norm);
+                continue;
+            }
+
+            char* title = read_title_from_file(norm);
+            int64_t mtime = DAWN_BACKEND(app)->mtime(norm);
+            push_deleted(norm, title, mtime > 0 ? mtime * 1000 : 0, 0);
+            free(title);
+            free(norm);
+        }
+        for (int32_t i = 0; i < name_count; i++)
+            free(names[i]);
+        free(names);
+    }
+
+    if (app.hist_deleted_sel >= app.hist_deleted_count)
+        app.hist_deleted_sel = app.hist_deleted_count > 0 ? app.hist_deleted_count - 1 : 0;
+    if (app.hist_deleted_sel < 0)
+        app.hist_deleted_sel = 0;
+}
+
+void hist_free_deleted(void)
+{
+    if (app.hist_deleted) {
+        for (int32_t i = 0; i < app.hist_deleted_count; i++) {
+            free(app.hist_deleted[i].path);
+            free(app.hist_deleted[i].title);
+            free(app.hist_deleted[i].date_str);
+        }
+        free(app.hist_deleted);
+        app.hist_deleted = NULL;
+    }
+    app.hist_deleted_count = 0;
+    app.hist_deleted_sel = 0;
 }
 
 // #endregion

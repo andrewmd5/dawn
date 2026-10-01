@@ -434,9 +434,55 @@ void render_history(void)
 {
     render_clear();
 
+    if (app.hist_show_deleted) {
+        if (app.hist_deleted_count == 0) {
+            render_center_text(app.rows / 2, "nothing to restore", get_dim());
+            render_center_text(app.rows / 2 + 2, "[r]/[esc] back", get_dim());
+            return;
+        }
+
+        move_to(2, 4);
+        set_fg(get_fg());
+        platform_write_str("deleted notes");
+
+        int32_t visible = app.rows - 6;
+        int32_t start = 0;
+        if (app.hist_deleted_sel >= visible)
+            start = app.hist_deleted_sel - visible + 1;
+
+        for (int32_t i = 0; i < visible && start + i < app.hist_deleted_count; i++) {
+            int32_t idx = start + i;
+            HistoryEntry* entry = &app.hist_deleted[idx];
+
+            move_to(4 + i, 4);
+            if (idx == app.hist_deleted_sel) {
+                set_fg(get_accent());
+                platform_write_str("> ");
+            } else {
+                set_fg(get_dim());
+                platform_write_str("  ");
+            }
+
+            const char* title = entry->title ? entry->title : "Untitled";
+            char title_buf[64];
+            snprintf(title_buf, sizeof(title_buf), "%-30.30s  ", title);
+            platform_write_str(title_buf);
+            set_fg(get_dim());
+            platform_write_str(entry->date_str);
+        }
+
+        move_to(app.rows - 1, 4);
+        set_fg(get_dim());
+        platform_write_str("[j/k] select   [o] restore   [r] back   [esc] back");
+        return;
+    }
+
     if (app.hist_count == 0) {
         render_center_text(app.rows / 2, "no history yet", get_dim());
-        render_center_text(app.rows / 2 + 2, "[esc] back", get_dim());
+        if (app.hist_deleted_count > 0)
+            render_center_text(app.rows / 2 + 2, "[r] restore deleted   [esc] back", get_dim());
+        else
+            render_center_text(app.rows / 2 + 2, "[esc] back", get_dim());
         return;
     }
 
@@ -473,7 +519,42 @@ void render_history(void)
 
     move_to(app.rows - 1, 4);
     set_fg(get_dim());
-    platform_write_str("[j/k] move   [g/G] ends   [o] open   [t] title   [d] del   [e] finder   [esc] back");
+    platform_write_str("[j/k] select   [o] open   [t] title   [d] delete   [r] restore   [e] finder   [esc] back");
+
+    if (app.hist_confirm && app.hist_confirm_idx >= 0 && app.hist_confirm_idx < app.hist_count) {
+        HistoryEntry* entry = &app.history[app.hist_confirm_idx];
+        const char* title = entry->title ? entry->title : "Untitled";
+
+        char title_disp[40];
+        snprintf(title_disp, sizeof(title_disp), "%.35s", title);
+
+        char msg[128];
+        snprintf(msg, sizeof(msg), "delete \"%.35s\" from history?", title_disp);
+
+        int32_t width = (int32_t)strlen(msg) + 8;
+        if (width < 44)
+            width = 44;
+        if (width > app.cols - 4)
+            width = app.cols - 4;
+        int32_t height = 8;
+        int32_t top, left;
+        render_popup_box(width, height, &top, &left);
+
+        set_bg(get_modal_bg());
+        move_to(top + 2, left + (width - (int32_t)strlen(msg)) / 2);
+        set_fg(get_fg());
+        platform_write_str(msg);
+
+        move_to(top + 3, left + (width - 28) / 2);
+        set_fg(get_dim());
+        platform_write_str("file will be kept on disk.");
+
+        move_to(top + 5, left + (width - 24) / 2);
+        set_fg(get_accent());
+        platform_write_str("[y] delete");
+        set_fg(get_dim());
+        platform_write_str("   [n] cancel");
+    }
 }
 
 void render_finished(void)
