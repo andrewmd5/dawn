@@ -194,10 +194,18 @@ void render_welcome(void)
     render_text_at(row, col2 + 2, " theme", get_dim());
 
     row += 2;
-    render_text_at(row, col1, "q", get_accent());
-    render_text_at(row, col1 + 6, " quit", get_dim());
+    render_text_at(row, col1, "v", get_accent());
+    {
+        char vim_label[32];
+        snprintf(vim_label, sizeof(vim_label), " vim: %s", app.vim.enabled ? "on" : "off");
+        render_text_at(row, col1 + 6, vim_label, get_dim());
+    }
     render_text_at(row, col2, "?", get_accent());
     render_text_at(row, col2 + 2, " help", get_dim());
+
+    row += 2;
+    render_text_at(row, col1, "q", get_accent());
+    render_text_at(row, col1 + 6, " quit", get_dim());
 
 #if HAS_LIBAI
     if (app.ai_ready) {
@@ -250,7 +258,7 @@ void render_timer_select(void)
             (int32_t)i == app.preset_idx ? get_accent() : get_dim());
     }
 
-    render_center_text(app.rows - 2, "[j/k] select   [enter] confirm   [esc] back", get_dim());
+    render_center_text(app.rows - 2, "[j/k] select   [g/G] first/last   [enter] confirm   [esc] back", get_dim());
 }
 
 void render_style_select(void)
@@ -279,7 +287,7 @@ void render_style_select(void)
 void render_help(void)
 {
     int32_t width = 44;
-    int32_t height = 26;
+    int32_t height = app.vim.enabled ? 34 : 27;
     int32_t top, left;
     render_popup_box(width, height, &top, &left);
 
@@ -317,6 +325,10 @@ void render_help(void)
     platform_write_str("pgup/pgdn");
     move_to(cy++, col2);
     platform_write_str("scroll page");
+    move_to(cy, col1);
+    platform_write_str("j/k g/G");
+    move_to(cy++, col2);
+    platform_write_str("lists first/last");
     move_to(cy, col1);
     platform_write_str("^L");
     move_to(cy++, col2);
@@ -383,6 +395,34 @@ void render_help(void)
     move_to(cy++, col2);
     platform_write_str("AI chat");
 #endif
+
+    if (app.vim.enabled) {
+        cy++;
+        move_to(cy++, col1);
+        set_fg(get_accent());
+        platform_set_bold(true);
+        platform_write_str("VIM");
+        platform_reset_attrs();
+        set_bg(get_modal_bg());
+        set_fg(get_dim());
+
+        move_to(cy, col1);
+        platform_write_str("i/a/o Esc");
+        move_to(cy++, col2);
+        platform_write_str("insert/normal");
+        move_to(cy, col1);
+        platform_write_str("d/y/c motion");
+        move_to(cy++, col2);
+        platform_write_str("delete/yank/chg");
+        move_to(cy, col1);
+        platform_write_str("v/V x p . :");
+        move_to(cy++, col2);
+        platform_write_str("visual/del/put/cmd");
+        move_to(cy, col1);
+        platform_write_str(":w :q :q!");
+        move_to(cy++, col2);
+        platform_write_str("save/menu/quit");
+    }
 
     // Footer
     move_to(top + height - 2, left + (width - 22) / 2);
@@ -935,7 +975,7 @@ void render_toc(void)
     // Footer
     move_to(top + height - 2, content_left);
     set_fg(get_dim());
-    platform_write_str("↑↓:nav  enter:jump  esc:close");
+    platform_write_str("j/k:nav  ^U/^D:page  home/end  enter:jump  esc:close");
 
     // Position cursor at filter
     move_to(filter_row, content_left + 8 + toc->filter_len);
@@ -1073,7 +1113,7 @@ void render_search(void)
     // Footer
     move_to(top + height - 2, content_left);
     set_fg(get_dim());
-    platform_write_str("↑↓:nav  enter:jump  ^n/^p:next/prev  esc:close");
+    platform_write_str("j/k:nav  ^U/^D:page  ^n/^p:next/prev  enter:jump  esc:close");
 
     // Position cursor at search
     move_to(search_row, content_left + 6 + search->query_len);

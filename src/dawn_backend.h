@@ -40,6 +40,11 @@ DAWN_ENUM(uint8_t) {
     DAWN_UNDERLINE_DASHED
 } DawnUnderline;
 
+DAWN_ENUM(uint8_t) {
+    DAWN_CURSOR_BLOCK, //!< Solid block (normal/visual/command)
+    DAWN_CURSOR_BEAM //!< Vertical bar (insert mode)
+} DawnCursorShape;
+
 DAWN_ENUM(int32_t) {
     DAWN_KEY_NONE = -1,
     DAWN_KEY_ESC = 0x1b,
@@ -124,6 +129,7 @@ typedef struct DawnBackend {
     void (*get_size)(int32_t* cols, int32_t* rows);
     void (*set_cursor)(int32_t col, int32_t row);
     void (*set_cursor_visible)(bool visible);
+    void (*set_cursor_shape)(DawnCursorShape shape);
     void (*set_fg)(DawnColor c);
     void (*set_bg)(DawnColor c);
     void (*reset_attrs)(void);

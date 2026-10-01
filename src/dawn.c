@@ -25,6 +25,7 @@
 #include "dawn_timer.h"
 #include "dawn_toc.h"
 #include "dawn_utils.h"
+#include "dawn_vim.h"
 #include "dawn_wrap.h"
 
 // Platform capability check macro
@@ -2621,10 +2622,38 @@ static void render_status_bar(const Layout* L)
     for (int32_t i = 0; i < L->text_area_cols; i++)
         out_char(' ');
 
+    // Vim command line replaces the status bar while typing : or / commands.
+    if (app.vim.enabled && app.vim.mode == VIM_COMMAND) {
+        move_to(app.rows, status_left);
+        set_fg(get_accent());
+        out_char(app.vim.cmd_search ? '/' : ':');
+        set_fg(get_fg());
+        for (size_t i = 0; i < app.vim.cmdline_len; i++)
+            out_char(app.vim.cmdline[i]);
+        return;
+    }
+
     move_to(app.rows, status_left);
     set_fg(get_dim());
 
     bool need_sep = false;
+
+    if (app.vim.enabled) {
+        set_fg(get_accent());
+        const char* label = vim_mode_label();
+        // Compact mode tag: N/I/V/VL
+        const char* short_label = label;
+        if (app.vim.mode == VIM_NORMAL)
+            short_label = "N";
+        else if (app.vim.mode == VIM_INSERT)
+            short_label = "I";
+        else if (app.vim.mode == VIM_VISUAL)
+            short_label = "V";
+        else if (app.vim.mode == VIM_VISUAL_LINE)
+            short_label = "VL";
+        out_str(short_label);
+        need_sep = true;
+    }
 
     if (app.timer_mins > 0 && app.timer_on) {
         int32_t rem = timer_remaining();
@@ -2664,6 +2693,13 @@ static void render_status_bar(const Layout* L)
         char sel_buf[32];
         snprintf(sel_buf, sizeof(sel_buf), "%zu sel", sel_e - sel_s);
         out_str(sel_buf);
+    }
+
+    if (app.vim.enabled && app.vim.status[0] != '\0') {
+        set_fg(get_border());
+        out_str(" · ");
+        set_fg(get_accent());
+        out_str(app.vim.status);
     }
 
     // Right side hints
@@ -3318,6 +3354,18 @@ static void render(void)
         break;
     }
 
+    // Beam cursor in vim insert mode, block everywhere else (interactive only,
+    // so print/piped output never gets cursor-shape escapes). With vim mode
+    // off the cursor stays block, as before.
+    if (app.ctx.mode == DAWN_MODE_INTERACTIVE) {
+        DawnCursorShape want = (app.vim.enabled && app.vim.mode == VIM_INSERT) ? DAWN_CURSOR_BEAM : DAWN_CURSOR_BLOCK;
+        static DawnCursorShape applied = (DawnCursorShape)-1;
+        if (want != applied) {
+            cursor_shape(want);
+            applied = want;
+        }
+    }
+
     sync_end();
     out_flush();
 }
@@ -3356,6 +3404,14 @@ static void new_session(void)
 
     app.cursor = 0;
     app.selecting = false;
+    app.vim.mode = app.vim.enabled ? VIM_NORMAL : VIM_INSERT;
+    app.vim.pending_op = VIM_OP_NONE;
+    app.vim.pending_g = false;
+    app.vim.count = 0;
+    app.vim.count_op = 0;
+    app.vim.cmdline_len = 0;
+    app.vim.status[0] = '\0';
+    app.vim.find_op = 0;
     app.timer_done = false;
     app.timer_on = (app.timer_mins > 0);
     if (app.timer_on) {
@@ -3393,6 +3449,10 @@ static void move_cursor(size_t new_pos, bool extend_sel)
 
 static void handle_writing(int32_t key)
 {
+    // Neovim-style modal editing takes precedence when enabled.
+    if (app.vim.enabled && vim_handle_key(key))
+        return;
+
     size_t len = gap_len(&app.text);
 
     switch (key) {
@@ -4091,6 +4151,12 @@ static void handle_input(void)
             app.hl_ctx = highlight_init(app.theme == THEME_DARK);
             settings_save();
             break;
+        case 'v':
+        case 'V':
+            app.vim.enabled = !app.vim.enabled;
+            app.vim.mode = app.vim.enabled ? VIM_NORMAL : VIM_INSERT;
+            settings_save();
+            break;
         case '?':
             MODE_PUSH(MODE_HELP);
             break;
@@ -4116,6 +4182,18 @@ static void handle_input(void)
             app.timer_mins = TIMER_PRESETS[app.preset_idx];
             settings_save();
             break;
+        case 'g':
+        case DAWN_KEY_HOME:
+            app.preset_idx = 0;
+            app.timer_mins = TIMER_PRESETS[app.preset_idx];
+            settings_save();
+            break;
+        case 'G':
+        case DAWN_KEY_END:
+            app.preset_idx = (int32_t)NUM_PRESETS - 1;
+            app.timer_mins = TIMER_PRESETS[app.preset_idx];
+            settings_save();
+            break;
         case '\r':
         case '\n':
             app.mode = MODE_WELCOME;
@@ -4137,6 +4215,14 @@ static void handle_input(void)
         case DAWN_KEY_DOWN:
             if (app.style < STYLE_ELEGANT)
                 app.style++;
+            break;
+        case 'g':
+        case DAWN_KEY_HOME:
+            app.style = STYLE_MINIMAL;
+            break;
+        case 'G':
+        case DAWN_KEY_END:
+            app.style = STYLE_ELEGANT;
             break;
         case '\r':
         case '\n':
@@ -4215,6 +4301,29 @@ static void handle_input(void)
         case DAWN_KEY_DOWN:
             if (app.hist_sel < app.hist_count - 1)
                 app.hist_sel++;
+            break;
+        case 'g':
+        case DAWN_KEY_HOME:
+            app.hist_sel = 0;
+            break;
+        case 'G':
+        case DAWN_KEY_END:
+            if (app.hist_count > 0)
+                app.hist_sel = app.hist_count - 1;
+            break;
+        case DAWN_KEY_PGUP:
+        case 21: // Ctrl+U: half-page up
+            app.hist_sel -= 10;
+            if (app.hist_sel < 0)
+                app.hist_sel = 0;
+            break;
+        case DAWN_KEY_PGDN:
+        case 4: // Ctrl+D: half-page down
+            app.hist_sel += 10;
+            if (app.hist_sel >= app.hist_count)
+                app.hist_sel = app.hist_count - 1;
+            if (app.hist_sel < 0)
+                app.hist_sel = 0;
             break;
         case 'o':
         case '\r':
@@ -4809,14 +4918,24 @@ static void handle_input(void)
                 toc->selected++;
             break;
         case DAWN_KEY_PGUP:
+        case 21: // Ctrl+U: page up
             toc->selected -= 10;
             if (toc->selected < 0)
                 toc->selected = 0;
             break;
         case DAWN_KEY_PGDN:
+        case 4: // Ctrl+D: page down
             toc->selected += 10;
             if (toc->selected >= toc->filtered_count)
                 toc->selected = toc->filtered_count - 1;
+            if (toc->selected < 0)
+                toc->selected = 0;
+            break;
+        case DAWN_KEY_HOME:
+            toc->selected = 0;
+            break;
+        case DAWN_KEY_END:
+            toc->selected = toc->filtered_count - 1;
             if (toc->selected < 0)
                 toc->selected = 0;
             break;
@@ -4872,14 +4991,24 @@ static void handle_input(void)
                 search->selected++;
             break;
         case DAWN_KEY_PGUP:
+        case 21: // Ctrl+U: page up
             search->selected -= 10;
             if (search->selected < 0)
                 search->selected = 0;
             break;
         case DAWN_KEY_PGDN:
+        case 4: // Ctrl+D: page down
             search->selected += 10;
             if (search->selected >= search->count)
                 search->selected = search->count - 1;
+            if (search->selected < 0)
+                search->selected = 0;
+            break;
+        case DAWN_KEY_HOME:
+            search->selected = 0;
+            break;
+        case DAWN_KEY_END:
+            search->selected = search->count - 1;
             if (search->selected < 0)
                 search->selected = 0;
             break;
@@ -4941,6 +5070,7 @@ bool dawn_engine_init(int8_t theme_override, int32_t timer_override)
     }
 
     gap_init(&app.text, 4096);
+    app.vim.mode = app.vim.enabled ? VIM_NORMAL : VIM_INSERT;
     hist_load();
 
     app.block_cache = malloc(sizeof(BlockCache));
@@ -4969,6 +5099,12 @@ bool dawn_engine_init(int8_t theme_override, int32_t timer_override)
 void dawn_engine_shutdown(void)
 {
     DAWN_BACKEND(app)->set_title(NULL);
+
+    // Leave the terminal with a standard block cursor.
+    if (app.ctx.mode == DAWN_MODE_INTERACTIVE) {
+        cursor_shape(DAWN_CURSOR_BLOCK);
+        out_flush();
+    }
 
     if (gap_len(&app.text) > 0 && app.mode == MODE_WRITING && !app.preview_mode)
         save_session();

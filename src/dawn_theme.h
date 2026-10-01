@@ -51,6 +51,10 @@ void clear_range(int32_t n);
 //! Show or hide the cursor
 void cursor_visible(bool visible);
 
+//! Set cursor shape: beam (vertical bar) for insert, block otherwise
+//! @param shape desired cursor shape
+void cursor_shape(DawnCursorShape shape);
+
 //! Move cursor to home position (1,1)
 void cursor_home(void);
 

@@ -21,6 +21,10 @@
 #define CURSOR_HIDE CSI "?25l"
 #define CURSOR_SHOW CSI "?25h"
 
+// DECSCUSR cursor shapes (steady variants to avoid distraction)
+#define CURSOR_BLOCK CSI "2 q" //!< Steady block
+#define CURSOR_BEAM CSI "6 q" //!< Steady vertical bar
+
 #define ALT_SCREEN_ON CSI "?1049h"
 #define ALT_SCREEN_OFF CSI "?1049l"
 

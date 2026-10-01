@@ -686,6 +686,11 @@ static void posix_set_cursor_visible(bool visible)
     buf_append_str(visible ? CURSOR_SHOW : CURSOR_HIDE);
 }
 
+static void posix_set_cursor_shape(DawnCursorShape shape)
+{
+    buf_append_str(shape == DAWN_CURSOR_BEAM ? CURSOR_BEAM : CURSOR_BLOCK);
+}
+
 static void posix_set_fg(DawnColor color)
 {
     buf_fg(color.r, color.g, color.b);
@@ -2351,6 +2356,7 @@ const DawnBackend dawn_backend_posix = {
     .get_size = posix_get_size,
     .set_cursor = posix_set_cursor,
     .set_cursor_visible = posix_set_cursor_visible,
+    .set_cursor_shape = posix_set_cursor_shape,
     .set_fg = posix_set_fg,
     .set_bg = posix_set_bg,
     .reset_attrs = posix_reset_attrs,

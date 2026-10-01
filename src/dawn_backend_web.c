@@ -42,6 +42,7 @@ static struct {
     int32_t draw_cursor_col; // Where to draw visible cursor (set by set_cursor)
     int32_t draw_cursor_row;
     bool cursor_visible;
+    bool cursor_beam; // true = vertical bar (insert), false = block
 
     // Current text attributes
     uint8_t fg_r, fg_g, fg_b;
@@ -224,7 +225,7 @@ EM_JS(void, js_draw_text, (int32_t col, int32_t row, const char* text, int32_t n
    }
 });
 
-EM_JS(void, js_draw_cursor, (int32_t col, int32_t row, int32_t r, int32_t g, int32_t b), {
+EM_JS(void, js_draw_cursor, (int32_t col, int32_t row, int32_t r, int32_t g, int32_t b, int32_t beam), {
     const ctx = window.dawnCtx;
     const x = (col - 1) * window.dawnCellWidth;
     const y = (row - 1) * window.dawnCellHeight;
@@ -239,7 +240,11 @@ EM_JS(void, js_draw_cursor, (int32_t col, int32_t row, int32_t r, int32_t g, int
    }
 
     ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-    ctx.fillRect(x, y, 2, window.dawnCellHeight);
+    if (beam) {
+        ctx.fillRect(x, y, 2, window.dawnCellHeight);
+    } else {
+        ctx.fillRect(x, y, window.dawnCellWidth, window.dawnCellHeight);
+    }
 });
 
 EM_JS(void, js_clear_rect, (int32_t col, int32_t row, int32_t width, int32_t height, int32_t r, int32_t g, int32_t b), {
@@ -602,6 +607,11 @@ static void web_set_cursor(int32_t col, int32_t row)
 static void web_set_cursor_visible(bool visible)
 {
     web_state.cursor_visible = visible;
+}
+
+static void web_set_cursor_shape(DawnCursorShape shape)
+{
+    web_state.cursor_beam = (shape == DAWN_CURSOR_BEAM);
 }
 
 static void web_set_fg(DawnColor color)
@@ -1144,8 +1154,9 @@ static void web_flush(void)
     // Draw cursor at the position set by set_cursor (not the auto-advancing cursor_col)
     if (web_state.cursor_visible) {
         js_draw_cursor(web_state.draw_cursor_col, web_state.draw_cursor_row,
-            web_state.fg_r, web_state.fg_g, web_state.fg_b);
-   }
+            web_state.fg_r, web_state.fg_g, web_state.fg_b,
+            web_state.cursor_beam ? 1 : 0);
+    }
 }
 
 static void web_sync_begin(void)
@@ -1626,6 +1637,7 @@ const DawnBackend dawn_backend_web = {
     .get_size = web_get_size,
     .set_cursor = web_set_cursor,
     .set_cursor_visible = web_set_cursor_visible,
+    .set_cursor_shape = web_set_cursor_shape,
     .set_fg = web_set_fg,
     .set_bg = web_set_bg,
     .reset_attrs = web_reset_attrs,

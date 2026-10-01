@@ -97,6 +97,12 @@ void cursor_visible(bool visible)
     DAWN_BACKEND(app)->set_cursor_visible(visible);
 }
 
+void cursor_shape(DawnCursorShape shape)
+{
+    if (DAWN_BACKEND(app)->set_cursor_shape)
+        DAWN_BACKEND(app)->set_cursor_shape(shape);
+}
+
 void cursor_home(void)
 {
     move_to(1, 1);
